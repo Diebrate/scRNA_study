@@ -5,7 +5,12 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 from matplotlib import cm
 
-data = anndata.read(r'..\data\proc_data\proc_data')
+batch = False
+
+if batch:
+    data = anndata.read(r'..\data\proc_data\proc_data')
+else:
+    data = anndata.read(r'..\data\proc_data\proc_data_no_batch')
 df = pd.DataFrame()
 
 import os
