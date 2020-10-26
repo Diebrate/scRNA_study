@@ -38,8 +38,8 @@ df['umap1'] = data.obsm['X_umap'][:, 0]
 df['umap2'] = data.obsm['X_umap'][:, 1]
 df['phate1'] = data.obsm['X_phate'][:, 0]
 df['phate2'] = data.obsm['X_phate'][:, 1]
-df['cluster'] = np.array(data.obs['louvain'])
-df['time_index'] = np.array(data.obs['batch'])
+df['cluster'] = np.array(data.obs['louvain'], dtype=int)
+df['time_index'] = np.array(data.obs['batch'], dtype=int)
 df['time'] = np.array([time_names[int(i)] for i in data.obs['batch']])
 
 fig = plt.figure(figsize=(12, 12), constrained_layout=True)
