@@ -38,6 +38,7 @@ for t in range(T):
 data = anndata.AnnData.concatenate(*data_raw)
     
 scanpy.pp.recipe_seurat(data)
+# scanpy.pp.combat(data)
 scanpy.tl.pca(data, n_comps=50)
 # scanpy.pp.neighbors(data)
 scanpy.external.pp.bbknn(data, batch_key='batch')
