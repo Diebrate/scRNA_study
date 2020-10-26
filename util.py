@@ -366,9 +366,12 @@ def cluster_with_best_k_hier(data, k_max=10, linkage='ward'):
     return cluster_opt
 
 
-def get_prob_cluster(label):
+def get_prob_cluster(label, k=None):
     # n = len(label)
-    k_max = max(label)
+    if k is None:
+        k_max = max(label)
+    else:
+        k_max = k - 1
     p = []
     for i in range(k_max+1):
         p.append(np.count_nonzero(label==i))

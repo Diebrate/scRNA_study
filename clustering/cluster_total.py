@@ -48,7 +48,7 @@ for i in range(len(cluster_ot)):
     plt.title('(total) knn ' + data_input.time_names[i] + ' to ' + data_input.time_names[i+1])
     plt.colorbar()
     reform_time_name = data_input.time_names[i].replace('.', '_') + 'to' + data_input.time_names[i+1].replace('.', '_')
-    plt.savefig(r'..\image\total_cluster\knn\total_knn_cluster_map_'+reform_time_name)
+    plt.savefig(r'..\image\total_cluster\knn\total_knn_cluster_map_' + reform_time_name)
 
 plt.figure(100)    
 scatter = plt.scatter(data=data, x='PC1', y='PC2', s=0.5, c='cluster')
