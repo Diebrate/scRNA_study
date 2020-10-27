@@ -4,7 +4,7 @@ import test_util
 import time
 start_time = time.time()
 
-n = 200
+n = 1
 n_sub = 10
 
 # centroids = np.array([[0,1],[1,0],[1,1],[0,0]])
@@ -42,7 +42,7 @@ test_total = []
 
 for i in range(n):
     lx_temp, ly_temp = test_util.simulate2d(p_start=p_start, p_trans=p_trans, mean=centroids, var=var, size=200)
-    test_temp = test_util.perm_test(test_util.ot_map_test, lx_temp, ly_temp, tail='right', n_times=2000, timer=False, M=M, k=k, reg=1)
+    test_temp = test_util.perm_test(test_util.ot_map_test1, lx_temp, ly_temp, tail='right', n_times=2000, timer=False, M=M, k=k, reg=1)
     # test_temp = test_util.perm_test(test_util.ot_map_test, lx_temp, ly_temp, tail='right', n_times=2000, timer=False, cluster=True, M=M, k=k, reg=100)
     test_total.append(test_temp)
     if (i + 1) % n_sub == 0:

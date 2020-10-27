@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import scipy.stats
 import statsmodels.api as sm
 import ot
@@ -17,7 +18,7 @@ def get_weight(x, k):
         px[int(i)] += 1
     for l in range(k):
         if px[l] == 0:
-            px[l] += 0.000001
+            px[l] += 0.0001
     return px / np.sum(px)
 
 
@@ -47,6 +48,13 @@ def get_offdiag(M):
 def ot_map_test(x, y, M, k, reg=1):
     px, py = get_weight(x, k), get_weight(y, k)
     ot_map = ot.sinkhorn(px, py, M, reg=reg)
+    return (ot_map**2).sum() - (ot_map[range(k),range(k)]**2).sum()
+
+
+def ot_map_test1(x, y, M, k, reg=1):
+    px, py = get_weight(x, k), get_weight(y, k)
+    ot_map = ot.sinkhorn(px, py, M, reg=reg)
+    ot_map = np.diag(1 / px) @ ot_map
     return (ot_map**2).sum() - (ot_map[range(k),range(k)]**2).sum()
 
 
@@ -161,7 +169,6 @@ def simulate2d(p_start, p_trans, mean, var, size=1000):
         y = np.vstack((y, np.random.multivariate_normal(mean[l], var)))
     ly_noise = get_label(y, centroids=mean)
     return lx_noise, ly_noise
-    
     
 
 
