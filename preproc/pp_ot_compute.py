@@ -15,7 +15,7 @@ start_time = time.time()
 batch = False
 do_iter = False
 graph = False
-method = 'phate'
+method = 'raw'
 save_fig = False
 
 if batch:
