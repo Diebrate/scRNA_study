@@ -15,7 +15,7 @@ start_time = time.time()
 batch = False
 do_iter = False
 graph = False
-method = 'raw'
+method = 'phate'
 save_fig = False
 
 if batch:
@@ -63,7 +63,7 @@ for metric in metric_list:
         if do_iter or save_fig:    
             plt.close('all')
 n_seed = 20
-reg = 50
+reg = 1
 M = test_util.get_cost_matrix(centroids, centroids, dim=dim)
 p_values = np.zeros((n_seed, T - 1))
 rank_sum = np.zeros(T - 1)
@@ -74,7 +74,7 @@ for i in range(n_seed):
         print('#####################################' + '\nStarting time index ' + str(t))
         x_temp = df.loc[df.time_index == t, 'cluster'].to_numpy()
         y_temp = df.loc[df.time_index == t+1, 'cluster'].to_numpy()
-        p_values[i, t] = test_util.perm_test(test_util.ot_map_test, x_temp, y_temp, tail='right', n_times=500, timer=True, M=M, k=k, reg=reg)['p_value']
+        p_values[i, t] = test_util.perm_test(test_util.ot_map_test1, x_temp, y_temp, tail='right', n_times=500, timer=True, M=M, k=k, reg=reg)['p_value']
         print('Finished time index ' + str(t) + '\n#####################################')
     rank_sum += np.array(pd.DataFrame(p_values[i]).rank(axis=0).iloc[:, 0])
     # rank_sum += T - 1 - np.argsort(p_values[i])

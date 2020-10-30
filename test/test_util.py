@@ -4,6 +4,7 @@ import scipy.stats
 import statsmodels.api as sm
 import ot
 from scipy import spatial
+import anndata
 
 
 def decimal_trunc(x, n_dec):
@@ -171,7 +172,56 @@ def simulate2d(p_start, p_trans, mean, var, size=1000):
     return lx_noise, ly_noise
     
 
-
+class OTwork:
+    
+    method = 'phate'
+    method_list = ['raw', 'pca', 'tsne', 'umap', 'phate']
+    
+    time_names = None
+    
+    reg = 50
+    centroids = None
+    
+    ot_cluster = {}
+    
+    def __init__(self, data_path, time_names=None):
+        self.data = anndata.read_h5ad(data_path)
+        if time_names is None:
+            self.time_names = self.data.obs['time'].unique().to_list()
+        else:
+            self.time_names = time_names
+        self.T = len(time_names)
+    
+    def set_reg(self, x):
+        self.reg = x
+        
+    def get_ot_cluster(self, method=method, inplace=False):
+        if method == 'raw':
+            df = pd.DataFrame(self.data.X)
+            df['cluster'] = self.data.obs['louvain']
+            self.centroids = df.groupby('cluster').mean().to_numpy()
+        else:
+            df = pd.DataFrame()
+            df[method + '1'] = self.data.obsm['X_' + method][:, 0]
+            df[method + '2'] = self.data.obsm['X_' + method][:, 1]
+            df['cluster'] = self.data.obs['louvain']
+            self.centroids = df.groupby('cluster').mean().to_numpy()
+        costm = get_cost_matrix(self.centroids, self.centroids, dim=self.centroids.shape[1], method='euclidean')
+        batch = self.data.obs['batch'].astype('int32')
+        tmap = []
+        for t in range(self.T - 1):
+            p1_temp = self.data.obs['louvain'][batch == t]
+            p2_temp = self.data.obs['louvain'][batch == t + 1]
+            tmap.append(ot.sinkhorn(p1_temp, p2_temp, M=costm, reg=self.reg))
+        if inplace:
+            self.ot_cluster.update({method: tmap})
+        else:
+            return method, self.reg, tmap
+    
+    def test_cp(tset_func, single=True, index=None):
+        pass
+        
+        
     
     
     
