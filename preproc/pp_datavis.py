@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 from matplotlib import cm
 
-batch = False
+batch = True
 
 if batch:
     data = anndata.read(r'..\data\proc_data\proc_data')
