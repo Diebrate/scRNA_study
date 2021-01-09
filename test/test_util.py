@@ -8,27 +8,6 @@ import anndata
 import solver
 
 
-# test data
-n = 200
-m = 200
-
-# r = np.random.rand(3)
-# c = np.random.rand(3)
-# r, c = r / sum(r), c / sum(c)
-r = [0.3, 0.4, 0.3]
-c = [0.3, 0.4, 0.3]
-a = np.random.choice(range(3), p=r, size=n)
-b = np.random.choice(range(3), p=c, size=m)
-
-px = [0.6, 0.2, 0.2]
-py = [0.2, 0.2, 0.6]
-x = np.random.choice(range(3), p=px, size=n)
-y = np.random.choice(range(3), p=py, size=m)
-
-costm = np.random.rand(3, 3)
-reg = 10
-
-
 def decimal_trunc(x, n_dec):
     x_temp = x * (10 ** n_dec)
     x_temp = np.trunc(x_temp)
@@ -153,109 +132,85 @@ def perm_test(test_func, x, y, tail, n_times=2000, timer=True, cluster=False, **
             'reference': reference}
 
 
-def diag_test(x, y, costm, reg=10, n_sim=1000):
-    k = np.concatenate((x, y)).max() + 1
-    px = np.zeros(k)
-    py = np.zeros(k)
-    for x_temp in x:
-        px[x_temp] += 1
-    for p in px:
-        if p == 0:
-            p += 0.00001
-    for y_temp  in y:
-        py[y_temp] += 1
-    for p in py:
-        if p == 0:
-            p += 0.00001
-    r = px / sum(px)
-    c = py / sum(py)
-    res = solver.ot_entropy_uv(r, c, costm, reg)
-    tmap = res['tmap']
-    u, v = res['uv']
-    K = res['K']
-    L = len(r)
-    D = np.block([[np.diag(1 / (K @ v)), np.zeros((L, L))],
-                  [np.zeros((L, L)), np.diag(1 / (K.transpose() @ u))]])
-    sigma_uu = -np.outer(r, r)
-    np.fill_diagonal(sigma_uu, r * (1 - r))
-    sigma_uu = sigma_uu / len(x)
-    sigma_vv = -np.outer(c, c)
-    np.fill_diagonal(sigma_vv, c * (1 - c))
-    sigma_vv = sigma_vv / len(y)
-    # sigma_uv = tmap - np.outer(r, c) / max(len(x), len(y))
-    sigma_uv = np.zeros((L, L))
-    sigma = np.block([[sigma_uu, sigma_uv],
-                      [sigma_uv.transpose(), sigma_vv]])
-    # p = tmap.flatten()
-    # data = np.zeros((n_sim, 2 * L))
-    # for i in range(n_sim):
-    #     choice = np.random.choice(L ** 2, p=p)
-    #     r_temp = np.zeros(L)
-    #     c_temp = np.zeros(L)
-    #     r_temp[choice // L] = 1
-    #     c_temp[choice % L] = 1
-    #     p_temp = np.concatenate((r_temp, c_temp))
-    #     data[i] = p_temp
-    #     # sigma += np.outer(p_temp, p_temp)
-    # data_mean = D @ data.mean(axis=0)
-    # sigma = np.cov(data, rowvar=False)
-    # sigma /= n_sim
-    # sigma -= np.outer(data_mean, data_mean)
+def diag_test(x1, x2, costm, reg, n_boot=1000):
+    N, M = len(x1), len(x2)
+    L = np.concatenate((x1, x2)).max() + 1
+    rho = np.sqrt(N * M / (N + M))
+    p1 = get_weight(x1, L)
+    p2 = get_weight(x2, L)
     zs = []
-    data_mean = D @ np.hstack((r, c))
-    cov = D @ sigma @ D.transpose()
-    # cov = D @ sigma @ D.transpose() / n_sim
-    for i in range(n_sim):
-        uv_temp = np.random.multivariate_normal(mean = data_mean, cov = cov)
-        u_temp = uv_temp[:L]
-        u_temp[u_temp < 0] = 0
-        v_temp = uv_temp[L:]
-        v_temp[v_temp < 0] = 0
-        zs.append(np.reshape(u_temp, (1, -1)) @ np.diag(np.diag(K)) @ v_temp)
-        # zs.append(np.linalg.norm(np.diag(np.diag(K)) @ v_temp, ord=2))
-        # zs.append(np.sum(np.diag(np.diag(K)) @ v_temp))
-        # zs.append(np.prod(np.reshape(u_temp, (1, -1)) @ np.diag(np.diag(K)) @ v_temp))
-        # zs.append(np.prod(np.diag(np.diag(K)) @ v_temp))
-        # zs.append((np.reshape(u_temp, (1, -1)) @ np.diag(np.diag(K)) @ v_temp).max())
-    z = np.reshape(u, (1, -1)) @ np.diag(np.diag(K)) @ v
-    # z = np.linalg.norm(np.diag(np.diag(K)) @ v, ord=2)
-    # z = np.sum(np.diag(np.diag(K)) @ v)
-    # z = np.prod(np.reshape(u, (1, -1)) @ np.diag(np.diag(K)) @ v)
-    # z = np.prod(np.diag(np.diag(K)) @ v)
-    # z = (np.reshape(u, (1, -1)) @ np.diag(np.diag(K)) @ v).max()
-    percentile = scipy.stats.percentileofscore(zs, z)
-    return percentile / 100
-
-
-def diag_test2(x, y, costm, reg=10, n_sim=500, n_boot=1000):
-    n, m = len(x), len(y)
-    L = np.concatenate((x, y)).max() + 1
-    r = get_weight(x, L)
-    c = get_weight(y, L)
-    res = solver.ot_entropy_uv(r, c, costm, reg)
-    K = res['K']
-    u, v = res['uv']
-    D = np.block([[np.diag(1 / (K @ v)), np.zeros((L, L))],
-                  [np.zeros((L, L)), np.diag(1 / (K.transpose() @ u))]])
-    # mimic sampling distribution of (r, c)
-    data = np.zeros((1000, 2 * L))
+    wass_base = solver.wasserstein_dual_sink(p1, p2, costm, reg)
+    u_base, v_base = solver.ot_sinkdiv(p1, p2, costm, reg)['uv_dual']
     for i in range(n_boot):
-        x_temp = np.random.choice(x, size=n)
-        y_temp = np.random.choice(y, size=m)
-        data[i] = np.concatenate((get_weight(x_temp, L), get_weight(y_temp, L)))
-    mean = D @ np.mean(data, axis=0)
-    cov = D @ np.cov(data, rowvar=False) @ D.transpose()
+        p1_temp = get_weight(np.random.choice(range(L), size=N, p=p1), L)
+        p2_temp = get_weight(np.random.choice(range(L), size=M, p=p2), L)
+        zs.append((rho ** 2) * (solver.wasserstein_dual_sink(p1_temp, p2_temp, costm, reg) -
+                  wass_base - np.inner(u_base, p1_temp - p1) - np.inner(v_base, p2_temp - p2)))
+    z = (rho ** 2) * wass_base
+    return np.mean(np.abs(zs) >= z)
+
+
+def perm_test1(x1, x2, costm, reg, n_sim=1000, fullreturn=False):
+    N, M = len(x1), len(x2)
+    L = np.concatenate((x1, x2)).max() + 1
+    p1 = get_weight(x1, L)
+    p2 = get_weight(x2, L)
+    z = solver.sink_loss(p1, p2, costm, reg)
     zs = []
+    data = np.concatenate((x1, x2))
     for i in range(n_sim):
-        uv_temp = np.random.multivariate_normal(mean=mean, cov=cov)
-        u_temp = uv_temp[:L]
-        u_temp[u_temp < 0] = 0
-        v_temp = uv_temp[L:]
-        v_temp[v_temp < 0] = 0
-        zs.append(np.reshape(u_temp, (1, -1)) @ np.diag(np.diag(K)) @ v_temp)
-    z = np.reshape(u, (1, -1)) @ np.diag(np.diag(K)) @ v
-    percentile = scipy.stats.percentileofscore(zs, z)
-    return percentile / 100
+        data_temp = np.random.permutation(data)
+        x1_temp = data_temp[:N]
+        x2_temp = data_temp[N:]
+        p1_temp = get_weight(x1_temp, L)
+        p2_temp = get_weight(x2_temp, L)
+        zs.append(solver.sink_loss(p1_temp, p2_temp, costm, reg))
+    if not fullreturn:
+        return np.mean(zs >= z)
+    else:
+        return {'zs': zs, 'pval': np.mean(zs >= z)}
+    
+    
+def perm_test1_unbalanced(x1, x2, costm, reg, reg1, reg2, n_sim=1000, fullreturn=False):
+    N, M = len(x1), len(x2)
+    L = np.concatenate((x1, x2)).max() + 1
+    p1 = get_weight(x1, L)
+    p2 = get_weight(x2, L)
+    z = solver.sink_loss(p1, p2, costm, reg)
+    zs = []
+    data = np.concatenate((x1, x2))
+    for i in range(n_sim):
+        data_temp = np.random.permutation(data)
+        x1_temp = data_temp[:N]
+        x2_temp = data_temp[N:]
+        p1_temp = get_weight(x1_temp, L)
+        p2_temp = get_weight(x2_temp, L)
+        zs.append(solver.sink_loss_unbalanced(p1_temp, p2_temp, costm, reg, reg1, reg2))
+    if not fullreturn:
+        return np.mean(zs >= z)
+    else:
+        return {'zs': zs, 'pval': np.mean(zs >= z)}
+
+
+def boot_test(x1, x2, costm, reg, n_boot=1000):
+    N, M = len(x1), len(x2)
+    L = np.concatenate((x1, x2)).max() + 1
+    p1 = get_weight(x1, L)
+    p2 = get_weight(x2, L)
+    z = solver.sink_loss(p1, p2, costm, reg)
+    zs = []
+    for i in range(n_boot):
+        p1_temp = get_weight(np.random.choice(x1, size=N), L)
+        p2_temp = get_weight(np.random.choice(x2, size=M), L)
+        zs.append(solver.sink_loss(p1_temp, p2_temp, costm, reg))
+    return np.mean(zs >= z)
+
+
+def boot_test_multi(x1, x2, costm, reg, n_boot=1000, n_seed=100):
+    p = []
+    for i in range(n_seed):
+        p.append(boot_test(x1, x2, costm, reg))
+    return p
 
 
 def simulate(k, p_start, p_trans, size=1000):
