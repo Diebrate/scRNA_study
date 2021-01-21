@@ -3,6 +3,7 @@ import pandas as pd
 import anndata
 import matplotlib.pyplot as plt
 import util
+import solver
 
 import os
 os.chdir(r'..\test\\')
@@ -17,6 +18,13 @@ do_iter = False
 graph = False
 method = 'phate'
 save_fig = False
+balanced = False
+fast = True
+sink=False
+
+reg = 1
+reg1 = 1
+reg2 = 1
 
 if batch:
     df = pd.read_csv(r'..\data\proc_data\proc_df.csv')
@@ -46,7 +54,22 @@ for metric in metric_list:
         probs.append(p_temp)
     probs = np.array(probs)
     dim = centroids.shape[1]
-    cluster_ot = util.compute_all_ot_cluster2(centroids, probs, dim=dim, reg=10)      
+    if balanced:
+        if fast:
+            costm = util.get_cost_matrix(centroids, centroids, dim)
+            probs_t1 = probs.transpose()[:, :-1]
+            probs_t2 = probs.transpose()[:, 1:]
+            cluster_ot = solver.ot_balanced_all(probs_t1, probs_t2, costm, reg=reg)
+        else:
+            cluster_ot = util.compute_all_ot_cluster2(centroids, probs, dim=dim, reg=reg) 
+    else:
+        if fast:
+            costm = util.get_cost_matrix(centroids, centroids, dim)
+            probs_t1 = probs.transpose()[:, :-1]
+            probs_t2 = probs.transpose()[:, 1:]
+            cluster_ot = solver.ot_unbalanced_all(probs_t1, probs_t2, costm, reg=reg, reg1=reg1, reg2=reg2)
+        else:
+            cluster_ot = util.compute_all_ot_cluster2_unbalanced(centroids, probs, dim=dim, reg=reg, reg1=reg1, reg2=reg2)
     if graph:
         for i in range(len(cluster_ot)):
             # cluster_ot[i] = cluster_ot[i] / cluster_ot[i].sum()
@@ -62,8 +85,7 @@ for metric in metric_list:
                 plt.savefig(r'..\image\pp_datavis\\' + ['no_batch', 'batch'][batch] + '\ot_map\\' + metric + '\pp_louvain_cluster_map_' + metric + '_' + reform_time_name + ['_no_batch', '_batch'][batch])
         if do_iter or save_fig:    
             plt.close('all')
-n_seed = 20
-reg = 1
+n_seed = 10
 M = test_util.get_cost_matrix(centroids, centroids, dim=dim)
 p_values = np.zeros((n_seed, T - 1))
 rank_sum = np.zeros(T - 1)
@@ -74,7 +96,16 @@ for i in range(n_seed):
         print('#####################################' + '\nStarting time index ' + str(t))
         x_temp = df.loc[df.time_index == t, 'cluster'].to_numpy()
         y_temp = df.loc[df.time_index == t+1, 'cluster'].to_numpy()
-        p_values[i, t] = test_util.perm_test(test_util.ot_map_test1, x_temp, y_temp, tail='right', n_times=500, timer=True, M=M, k=k, reg=reg)['p_value']
+        if balanced:
+            if fast:
+                p_values[i, t] = test_util.perm_test_balanced_fast(x_temp, y_temp, costm=M, reg=reg, k=k, sink=sink)
+            else:
+                p_values[i, t] = test_util.perm_test(test_util.ot_map_test1, x_temp, y_temp, tail='right', n_times=500, timer=True, M=M, k=k, reg=reg)['p_value']
+        else:
+            if fast:
+                p_values[i, t] = test_util.perm_test_unbalanced_fast(x_temp, y_temp, costm=M, reg=reg, reg1=reg1, reg2=reg2, k=k, sink=sink)
+            else:
+                p_values[i, t] = test_util.perm_test1_unbalanced(x_temp, y_temp, M, reg, reg1, reg2, k=k)
         print('Finished time index ' + str(t) + '\n#####################################')
     rank_sum += np.array(pd.DataFrame(p_values[i]).rank(axis=0).iloc[:, 0])
     # rank_sum += T - 1 - np.argsort(p_values[i])

@@ -24,6 +24,13 @@ def get_weight(x, k):
     return px / np.sum(px)
 
 
+def get_weight_no_ignore(x, k):
+    px = np.zeros(k)
+    for i in x:
+        px[int(i)] += 1
+    return px / np.sum(px)
+
+
 def get_entropy(p, k):
     e = 0
     for i in range(k):
@@ -150,9 +157,12 @@ def diag_test(x1, x2, costm, reg, n_boot=1000):
     return np.mean(np.abs(zs) >= z)
 
 
-def perm_test1(x1, x2, costm, reg, n_sim=1000, fullreturn=False):
-    N, M = len(x1), len(x2)
-    L = np.concatenate((x1, x2)).max() + 1
+def perm_test1(x1, x2, costm, reg, k=None, n_sim=1000, fullreturn=False):
+    N = len(x1)
+    if k is None:
+        L = np.concatenate((x1, x2)).max() + 1
+    else:
+        L = k
     p1 = get_weight(x1, L)
     p2 = get_weight(x2, L)
     z = solver.sink_loss(p1, p2, costm, reg)
@@ -165,18 +175,28 @@ def perm_test1(x1, x2, costm, reg, n_sim=1000, fullreturn=False):
         p1_temp = get_weight(x1_temp, L)
         p2_temp = get_weight(x2_temp, L)
         zs.append(solver.sink_loss(p1_temp, p2_temp, costm, reg))
+    pval = np.mean(zs >= z)
+    if pval == 0:
+        p_kde = sm.nonparametric.KDEUnivariate(zs)
+        p_kde.fit()
+        cdf = np.copy(p_kde.cdf)
+        cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
+        pval = decimal_trunc(1 - cdf[-1], 10)
     if not fullreturn:
-        return np.mean(zs >= z)
+        return pval
     else:
-        return {'zs': zs, 'pval': np.mean(zs >= z)}
+        return {'zs': zs, 'pval': pval}
     
     
-def perm_test1_unbalanced(x1, x2, costm, reg, reg1, reg2, n_sim=1000, fullreturn=False):
-    N, M = len(x1), len(x2)
-    L = np.concatenate((x1, x2)).max() + 1
+def perm_test1_unbalanced(x1, x2, costm, reg, reg1, reg2, k=None, n_sim=1000, fullreturn=False):
+    N = len(x1)
+    if k is None:
+        L = np.concatenate((x1, x2)).max() + 1
+    else:
+        L = k
     p1 = get_weight(x1, L)
     p2 = get_weight(x2, L)
-    z = solver.sink_loss(p1, p2, costm, reg)
+    z = solver.sink_loss(p1, p2, costm, reg, reg1, reg2)
     zs = []
     data = np.concatenate((x1, x2))
     for i in range(n_sim):
@@ -186,10 +206,292 @@ def perm_test1_unbalanced(x1, x2, costm, reg, reg1, reg2, n_sim=1000, fullreturn
         p1_temp = get_weight(x1_temp, L)
         p2_temp = get_weight(x2_temp, L)
         zs.append(solver.sink_loss_unbalanced(p1_temp, p2_temp, costm, reg, reg1, reg2))
+    pval = np.mean(zs >= z)
+    if pval == 0:
+        p_kde = sm.nonparametric.KDEUnivariate(zs)
+        p_kde.fit()
+        cdf = np.copy(p_kde.cdf)
+        cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
+        pval = decimal_trunc(1 - cdf[-1], 10)
     if not fullreturn:
-        return np.mean(zs >= z)
+        return pval
     else:
-        return {'zs': zs, 'pval': np.mean(zs >= z)}
+        return {'zs': zs, 'pval': pval}
+    
+    
+def perm_test_balanced_fast(x1, x2, costm, reg, k=None, sink=True, n_sim=1000, fullreturn=False):
+    N = len(x1)
+    if k is None:
+        L = np.concatenate((x1, x2)).max() + 1
+    else:
+        L = k
+    L = int(L)
+    p1 = get_weight(x1, L)
+    p2 = get_weight(x2, L)
+    if sink:
+        z = solver.sink_loss_balanced(p1, p2, costm, reg)
+    else:
+        z = solver.wass_loss_balanced(p1, p2, costm, reg)
+    data = np.concatenate((x1, x2))
+    d1 = np.zeros((L, n_sim))
+    d2 = np.zeros((L, n_sim))
+    for i in range(n_sim):
+        data_temp = np.random.permutation(data)
+        x1_temp = data_temp[:N]
+        x2_temp = data_temp[N:]
+        d1[:, i] = get_weight(x1_temp, L)
+        d2[:, i] = get_weight(x2_temp, L)
+    if sink:
+        zs = solver.sink_loss_balanced_all(d1, d2, costm, reg)
+    else:
+        zs = solver.wass_loss_balanced_all(d1, d2, costm, reg)
+    pval = np.mean(zs >= z)
+    if pval == 0:
+        p_kde = sm.nonparametric.KDEUnivariate(zs)
+        p_kde.fit()
+        cdf = np.copy(p_kde.cdf)
+        cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
+        pval = decimal_trunc(1 - cdf[-1], 10)
+    # if not sink:
+    #     pval = np.mean(zs >= z)
+    #     if pval == 0:
+    #         p_kde = sm.nonparametric.KDEUnivariate(zs)
+    #         p_kde.fit()
+    #         cdf = np.copy(p_kde.cdf)
+    #         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
+    #         pval = decimal_trunc(1 - cdf[-1], 10)
+    # else:
+    #     pval1 = np.mean(zs <= z)
+    #     pval2 = np.mean(zs >= z)
+    #     pval = np.min([pval1, pval2])
+    #     if pval == 0 or pval == 1:
+    #         p_kde = sm.nonparametric.KDEUnivariate(zs)
+    #         p_kde.fit()
+    #         cdf = np.copy(p_kde.cdf)
+    #         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
+    #         pval = 2 * decimal_trunc(cdf[0 if pval1 < pval2 else -1], 10)
+    if not fullreturn:
+        return pval
+    else:
+        return {'zs': zs, 'pval': pval}
+    
+    
+def perm_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, sink=True, n_sim=1000, fullreturn=False):
+    N = len(x1)
+    if k is None:
+        L = np.concatenate((x1, x2)).max() + 1
+    else:
+        L = k
+    L = int(L)
+    p1 = get_weight(x1, L)
+    p2 = get_weight(x2, L)
+    if sink:
+        z = solver.sink_loss_unbalanced(p1, p2, costm, reg, reg1, reg2)
+    else:
+        z = solver.wass_loss_unbalanced(p1, p2, costm, reg, reg1, reg2)
+    data = np.concatenate((x1, x2))
+    d1 = np.zeros((L, n_sim))
+    d2 = np.zeros((L, n_sim))
+    for i in range(n_sim):
+        data_temp = np.random.permutation(data)
+        x1_temp = data_temp[:N]
+        x2_temp = data_temp[N:]
+        d1[:, i] = get_weight(x1_temp, L)
+        d2[:, i] = get_weight(x2_temp, L)
+    if sink:
+        zs = solver.sink_loss_unbalanced_all(d1, d2, costm, reg, reg1, reg2)
+    else:
+        zs = solver.wass_loss_unbalanced_all(d1, d2, costm, reg, reg1, reg2)
+    pval = np.mean(zs >= z)
+    if pval == 0:
+        p_kde = sm.nonparametric.KDEUnivariate(zs)
+        p_kde.fit()
+        cdf = np.copy(p_kde.cdf)
+        cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
+    #     pval = decimal_trunc(1 - cdf[-1], 10)
+    # if not sink:
+    #     pval = np.mean(zs >= z)
+    #     if pval == 0:
+    #         p_kde = sm.nonparametric.KDEUnivariate(zs)
+    #         p_kde.fit()
+    #         cdf = np.copy(p_kde.cdf)
+    #         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
+    #         pval = decimal_trunc(1 - cdf[-1], 10)
+    # else:
+    #     pval1 = np.mean(zs <= z)
+    #     pval2 = np.mean(zs >= z)
+    #     pval = np.min([pval1, pval2])
+    #     if pval == 0 or pval == 1:
+    #         p_kde = sm.nonparametric.KDEUnivariate(zs)
+    #         p_kde.fit()
+    #         cdf = np.copy(p_kde.cdf)
+    #         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
+    #         pval = 2 * decimal_trunc(cdf[0 if pval1 < pval2 else -1], 10)
+    if not fullreturn:
+        return pval
+    else:
+        return {'zs': zs, 'pval': pval}
+    
+    
+def boot_test_balanced_fast(x1, x2, costm, reg, k=None, n_sim=1000, fullreturn=False):
+    N = len(x1)
+    M = len(x2)
+    if k is None:
+        L = np.concatenate((x1, x2)).max() + 1
+    else:
+        L = k
+    L = int(L)
+    p1 = get_weight(x1, L)
+    p2 = get_weight(x2, L)
+    z = solver.wass_loss_balanced(p1, p2, costm, reg)
+    d1 = np.zeros((L, n_sim))
+    d2 = np.zeros((L, n_sim))
+    for i in range(n_sim):
+        x1_temp = np.random.choice(x1, size=N)
+        x2_temp = np.random.choice(x2, size=M)
+        d1[:, i] = get_weight(x1_temp, L)
+        d2[:, i] = get_weight(x2_temp, L)
+    zs = solver.wass_loss_balanced_all(d1, d2, costm, reg)
+    pval = np.min([np.mean(zs >= z), np.mean(zs <= z)])
+    if pval == 0 or pval == 1:
+        p_kde = sm.nonparametric.KDEUnivariate(zs)
+        p_kde.fit()
+        cdf = np.copy(p_kde.cdf)
+        cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
+        pval = decimal_trunc(cdf[0 if pval == 0 else -1], 10)
+    if not fullreturn:
+        return pval
+    else:
+        return {'zs': zs, 'pval': pval}
+    
+    
+def boot_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, n_sim=1000, fullreturn=False):
+    N = len(x1)
+    M = len(x2)
+    if k is None:
+        L = np.concatenate((x1, x2)).max() + 1
+    else:
+        L = k
+    L = int(L)
+    p1 = get_weight(x1, L)
+    p2 = get_weight(x2, L)
+    z = solver.wass_loss_unbalanced(p1, p2, costm, reg, reg1, reg2)
+    d1 = np.zeros((L, n_sim))
+    d2 = np.zeros((L, n_sim))
+    for i in range(n_sim):
+        x1_temp = np.random.choice(x1, size=N)
+        x2_temp = np.random.choice(x2, size=M)
+        d1[:, i] = get_weight(x1_temp, L)
+        d2[:, i] = get_weight(x2_temp, L)
+    zs = solver.wass_loss_unbalanced_all(d1, d2, costm, reg, reg1, reg2)
+    pval = np.min([np.mean(zs >= z), np.mean(zs <= z)])
+    if pval == 0 or pval == 1:
+        p_kde = sm.nonparametric.KDEUnivariate(zs)
+        p_kde.fit()
+        cdf = np.copy(p_kde.cdf)
+        cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
+        pval = decimal_trunc(cdf[0 if pval == 0 else -1], 10)
+    if not fullreturn:
+        return pval
+    else:
+        return {'zs': zs, 'pval': pval}
+    
+    
+def growth_CI1(x1, x2, costm, reg, reg1, reg2, k=None, ignore_empty=True, n_sim=1000, conv=False):
+    N = len(x1)
+    M = len(x2)
+    if k is None:
+        L = np.concatenate((x1, x2)).max() + 1
+    else:
+        L = k
+    L = int(L)
+    if ignore_empty:
+        p1 = get_weight(x1, L)
+        p2 = get_weight(x2, L)
+    else:
+        p1 = get_weight_no_ignore(x1, L)
+        p2 = get_weight_no_ignore(x2, L)
+        label1 = np.arange(L)[p1 > 0]
+        label2 = np.arange(L)[p2 > 0]
+        costm = costm[p1 > 0, :]
+        costm = costm[:, p2 > 0]
+        p1 = p1[p1 > 0]
+        p2 = p2[p2 > 0]
+    z = solver.estimate_growth1(p1, p2, costm, reg, reg1, reg2, single=True, conv=conv)
+    d1 = np.zeros((L, n_sim))
+    d2 = np.zeros((L, n_sim))
+    for i in range(n_sim):
+        x1_temp = np.random.choice(x1, size=N)
+        x2_temp = np.random.choice(x2, size=M)
+        d1[:, i] = get_weight_no_ignore(x1_temp, L)
+        d2[:, i] = get_weight_no_ignore(x2_temp, L)
+    d1[d1 == 0] = 0.0001
+    d2[d2 == 0] = 0.0001
+    d1 = d1[label1, :]
+    d2 = d2[label2, :]
+    zs = solver.estimate_growth1(d1, d2, costm, reg, reg1, reg2, single=False, conv=conv)
+    zs = np.array(zs)
+    if ignore_empty:
+        return {'est': z, 
+                '2.5%': np.percentile(zs, 2.5, axis=0), 
+                '97.5%': np.percentile(zs, 97.5, axis=0),
+                'sim': zs}
+    else:
+        return {'est': z, 
+                '2.5%': np.percentile(zs, 2.5, axis=0), 
+                '97.5%': np.percentile(zs, 97.5, axis=0),
+                'sim': zs,
+                'valid_group1': label1,
+                'valid_group2': label2}
+
+
+def growth_CI2(x1, x2, costm, reg, reg1, reg2, k=None, ignore_empty=True, n_sim=1000, conv=False):
+    N = len(x1)
+    M = len(x2)
+    if k is None:
+        L = np.concatenate((x1, x2)).max() + 1
+    else:
+        L = k
+    L = int(L)
+    if ignore_empty:
+        p1 = get_weight(x1, L)
+        p2 = get_weight(x2, L)
+    else:
+        p1 = get_weight_no_ignore(x1, L)
+        p2 = get_weight_no_ignore(x2, L)
+        label1 = np.arange(L)[p1 > 0]
+        label2 = np.arange(L)[p2 > 0]
+        costm = costm[p1 > 0, :]
+        costm = costm[:, p2 > 0]
+        p1 = p1[p1 > 0]
+        p2 = p2[p2 > 0]
+    z = solver.estimate_growth2(p1, p2, costm, reg, reg1, reg2, single=True, conv=conv)
+    d1 = np.zeros((L, n_sim))
+    d2 = np.zeros((L, n_sim))
+    for i in range(n_sim):
+        x1_temp = np.random.choice(x1, size=N)
+        x2_temp = np.random.choice(x2, size=M)
+        d1[:, i] = get_weight_no_ignore(x1_temp, L)
+        d2[:, i] = get_weight_no_ignore(x2_temp, L)
+    d1[d1 == 0] = 0.0001
+    d2[d2 == 0] = 0.0001
+    d1 = d1[label1, :]
+    d2 = d2[label2, :]
+    zs = solver.estimate_growth2(d1, d2, costm, reg, reg1, reg2, single=False, conv=conv)
+    zs = np.array(zs)
+    if ignore_empty:
+        return {'est': z, 
+                '2.5%': np.percentile(zs, 2.5, axis=0), 
+                '97.5%': np.percentile(zs, 97.5, axis=0),
+                'sim': zs}
+    else:
+        return {'est': z, 
+                '2.5%': np.percentile(zs, 2.5, axis=0), 
+                '97.5%': np.percentile(zs, 97.5, axis=0),
+                'sim': zs,
+                'valid_group1': label1,
+                'valid_group2': label2}
+
 
 
 def boot_test(x1, x2, costm, reg, n_boot=1000):
@@ -252,58 +554,72 @@ def simulate2d(p_start, p_trans, mean, var, size=1000):
         y = np.vstack((y, np.random.multivariate_normal(mean[l], var)))
     ly_noise = get_label(y, centroids=mean)
     return lx_noise, ly_noise
-    
 
-class OTwork:
-    
-    method = 'phate'
-    method_list = ['raw', 'pca', 'tsne', 'umap', 'phate']
-    
-    time_names = None
-    
-    reg = 50
-    centroids = None
-    
-    ot_cluster = {}
-    
-    def __init__(self, data_path, time_names=None):
-        self.data = anndata.read_h5ad(data_path)
-        if time_names is None:
-            self.time_names = self.data.obs['time'].unique().to_list()
-        else:
-            self.time_names = time_names
-        self.T = len(time_names)
-    
-    def set_reg(self, x):
-        self.reg = x
-        
-    def get_ot_cluster(self, method=method, inplace=False):
-        if method == 'raw':
-            df = pd.DataFrame(self.data.X)
-            df['cluster'] = self.data.obs['louvain']
-            self.centroids = df.groupby('cluster').mean().to_numpy()
-        else:
-            df = pd.DataFrame()
-            df[method + '1'] = self.data.obsm['X_' + method][:, 0]
-            df[method + '2'] = self.data.obsm['X_' + method][:, 1]
-            df['cluster'] = self.data.obs['louvain']
-            self.centroids = df.groupby('cluster').mean().to_numpy()
-        costm = get_cost_matrix(self.centroids, self.centroids, dim=self.centroids.shape[1], method='euclidean')
-        batch = self.data.obs['batch'].astype('int32')
-        tmap = []
-        for t in range(self.T - 1):
-            p1_temp = self.data.obs['louvain'][batch == t]
-            p2_temp = self.data.obs['louvain'][batch == t + 1]
-            tmap.append(ot.sinkhorn(p1_temp, p2_temp, M=costm, reg=self.reg))
-        if inplace:
-            self.ot_cluster.update({method: tmap})
-        else:
-            return method, self.reg, tmap
-    
-    def test_cp(tset_func, single=True, index=None):
-        pass
-        
-        
+
+# test data
+##################################################
+# import seaborn as sns
+
+# n = 100
+# m = 100
+# n_null = 100
+# n_sim = 1000
+
+# k = 10
+# r = np.repeat(1, k)
+# c = r.copy()
+# r, c = r / sum(r), c / sum(c)
+# a = np.zeros((n_null, n))
+# b = np.zeros((n_null, m))
+
+# px = np.repeat(1, k)
+# py = np.arange(1, k + 1)
+# px, py = px / sum(px), py / sum(py)
+# x = np.zeros((n_null, n))
+# y = np.zeros((n_null, m))
+
+# for i in range(n_null):
+#     a[i] = np.random.choice(range(k), size=n, p=r)
+#     b[i] = np.random.choice(range(k), size=m, p=c)
+#     x[i] = np.random.choice(range(k), size=n, p=px)
+#     y[i] = np.random.choice(range(k), size=m, p=py)
+
+# a = np.array(a, dtype=int)
+# b = np.array(b, dtype=int)
+# x = np.array(x, dtype=int)
+# y = np.array(y, dtype=int)
+
+# costm = np.random.rand(k, k) 
+# costm = costm @ costm.transpose()
+# np.fill_diagonal(costm, 0)
+# reg = 0.5
+# reg1 = 1
+# reg2 = 50
+
+# index = 88
+
+# balanced = False
+# sink = False
+# fast = True
+
+# d1 = np.zeros((k, n_null))
+# d2 = np.zeros((k, n_null))
+# for i in range(n_null):
+#     d1[:, i] = get_weight(x[i], k)
+#     d2[:, i] = get_weight(y[i], k)
+
+# zs_null = solver.estimate_growth1(d1, d2, costm, reg, reg1, reg2, single=False)
+# zs = growth_CI1(x[index], y[index], costm, reg, reg1, reg2, n_sim=10000)['sim']
+
+# k_index = 7
+
+# df = pd.DataFrame()
+# df['value'] = np.concatenate((zs_null[:, k_index], zs[:, k_index]))
+# df['source'] = np.concatenate((np.repeat('null', zs_null.shape[0]),
+#                                np.repeat('boot', zs.shape[0])))
+# sns.kdeplot(data=df, x='value', hue='source', common_norm=False)
+##################################################
+
     
     
     

@@ -12,6 +12,7 @@ from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering as hierarchy
 from sklearn.metrics import calinski_harabasz_score
 
+import solver
 
 def decimal_trunc(x, n_dec):
     x_temp = x * (10 ** n_dec)
@@ -114,6 +115,25 @@ def compute_all_ot_cluster2(centroids, probs, dim, **kwargs):
             px_temp = px_temp / np.sum(px_temp)
             py_temp = py_temp / np.sum(py_temp)
         all_ot_matrix.append(ot_iter_cluster(px_temp, py_temp, centroids, centroids, dim=dim, **kwargs))
+    return np.array(all_ot_matrix)
+
+
+def compute_all_ot_cluster2_unbalanced(centroids, probs, dim, **kwargs):
+    # compute all OT matrices for total clustering
+    T = probs.shape[0]
+    k = centroids.shape[0]
+    all_ot_matrix = []
+    costm = get_cost_matrix(centroids, centroids, dim)
+    for t in range(T-1):
+        px_temp, py_temp = probs[t], probs[t+1]
+        for i in range(k):
+            if px_temp[i] == 0:
+                px_temp[i] += 0.00000001
+            if py_temp[i] == 0:
+                py_temp[i] += 0.00000001
+            px_temp = px_temp / np.sum(px_temp)
+            py_temp = py_temp / np.sum(py_temp)
+        all_ot_matrix.append(solver.ot_unbalanced(px_temp, py_temp, costm, **kwargs))
     return np.array(all_ot_matrix)
 
 
