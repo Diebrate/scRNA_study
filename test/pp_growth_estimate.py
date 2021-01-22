@@ -14,14 +14,11 @@ import time
 start_time = time.time()
 
 batch = False
-do_iter = False
-graph = False
 method = 'phate'
-save_fig = False
 conv = True
 
-reg = 0.1
-reg1 = 1
+reg = 1
+reg1 = 2.5
 reg2 = 50
 
 if batch:
@@ -34,19 +31,14 @@ time_names = time_names['time'].to_numpy()
 T = len(time_names)
 k = df['cluster'].max() + 1
 
-if do_iter:
-    metric_list = ['raw', 'pc', 'tsne', 'umap', 'phate']
-else:    
-    metric_list = [method]
-for metric in metric_list:
-    if metric in ['pc', 'tsne', 'umap', 'phate']:
-        centroids = df[[metric + '1', metric + '2', 'cluster']].groupby('cluster').mean().to_numpy()
-    elif metric == 'raw':
-        X = anndata.read_h5ad(r'..\data\proc_data\proc_data').X 
-        X = pd.DataFrame(X)
-        X['cluster'] = df.cluster
-        centroids = X.groupby('cluster').mean().to_numpy()      
-    dim = centroids.shape[1]
+if method in ['pc', 'tsne', 'umap', 'phate']:
+    centroids = df[[method + '1', method + '2', 'cluster']].groupby('cluster').mean().to_numpy()
+elif method == 'raw':
+    X = anndata.read_h5ad(r'..\data\proc_data\proc_data').X 
+    X = pd.DataFrame(X)
+    X['cluster'] = df.cluster
+    centroids = X.groupby('cluster').mean().to_numpy()      
+dim = centroids.shape[1]
     
 costm = util.get_cost_matrix(centroids, centroids, dim)
 

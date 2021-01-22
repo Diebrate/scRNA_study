@@ -176,7 +176,7 @@ def solve_growth(tmap, p, by_row=True):
     A = np.diag(marg) * A
     A = A - np.diag(p)
     b = p - marg
-    return 1 + np.linalg.solve(A, b)
+    return np.linalg.solve(A, b)
 
 
 def estimate_growth1(a, b, costm, reg, reg1, reg2, n_iter=1000, single=True, conv=False):
@@ -268,32 +268,37 @@ def optimal_lambda(a, b, costm, reg, reg2, reg1_min, reg1_max, step=20):
             'opt_index': opt_ind}
 
       
-# test data
+# test data 1
 ##################################################
-pa=np.repeat(1 / 5, 5)
-pb=np.array([1, 2, 3, 4, 5]) / (1 + 2 + 3 + 4 + 5)
-a=np.zeros((5, 100))
-b=np.zeros((5, 100))
-x=np.zeros((5, 100))
-y=np.zeros((5, 100))
-for i in range(100):
-    a_temp = np.random.multinomial(100, pa)
-    b_temp = np.random.multinomial(100, pa)
-    x_temp = np.random.multinomial(100, pa)
-    y_temp = np.random.multinomial(100, pb)
-    a[:,i] = a_temp / np.sum(a_temp)
-    b[:,i] = b_temp / np.sum(b_temp)
-    x[:,i] = x_temp / np.sum(x_temp)
-    y[:,i] = y_temp / np.sum(y_temp)
-costm = np.random.rand(5, 5) * 10
-costm = costm @ costm.transpose()
-np.fill_diagonal(costm, 0)
-reg = 10
-reg1 = 1
-reg2 = 1
+# pa=np.repeat(1 / 5, 5)
+# pb=np.array([1, 2, 3, 4, 5]) / (1 + 2 + 3 + 4 + 5)
+# a=np.zeros((5, 100))
+# b=np.zeros((5, 100))
+# x=np.zeros((5, 100))
+# y=np.zeros((5, 100))
+# for i in range(100):
+#     a_temp = np.random.multinomial(100, pa)
+#     b_temp = np.random.multinomial(100, pa)
+#     x_temp = np.random.multinomial(100, pa)
+#     y_temp = np.random.multinomial(100, pb)
+#     a[:,i] = a_temp / np.sum(a_temp)
+#     b[:,i] = b_temp / np.sum(b_temp)
+#     x[:,i] = x_temp / np.sum(x_temp)
+#     y[:,i] = y_temp / np.sum(y_temp)
+# costm = np.random.rand(5, 5) * 10
+# costm = costm @ costm.transpose()
+# np.fill_diagonal(costm, 0)
+# reg = 10
+# reg1 = 1
+# reg2 = 1
 # res = sink_loss_unbalanced_all(a, b, costm, reg, reg1, reg2)
 ##################################################
-    
+
+
+# test data 2
+##################################################
+
+##################################################    
 
 
 

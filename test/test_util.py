@@ -427,8 +427,9 @@ def growth_CI1(x1, x2, costm, reg, reg1, reg2, k=None, ignore_empty=True, n_sim=
         d2[:, i] = get_weight_no_ignore(x2_temp, L)
     d1[d1 == 0] = 0.0001
     d2[d2 == 0] = 0.0001
-    d1 = d1[label1, :]
-    d2 = d2[label2, :]
+    if not ignore_empty:
+        d1 = d1[label1, :]
+        d2 = d2[label2, :]
     zs = solver.estimate_growth1(d1, d2, costm, reg, reg1, reg2, single=False, conv=conv)
     zs = np.array(zs)
     if ignore_empty:
@@ -475,8 +476,9 @@ def growth_CI2(x1, x2, costm, reg, reg1, reg2, k=None, ignore_empty=True, n_sim=
         d2[:, i] = get_weight_no_ignore(x2_temp, L)
     d1[d1 == 0] = 0.0001
     d2[d2 == 0] = 0.0001
-    d1 = d1[label1, :]
-    d2 = d2[label2, :]
+    if not ignore_empty:
+        d1 = d1[label1, :]
+        d2 = d2[label2, :]
     zs = solver.estimate_growth2(d1, d2, costm, reg, reg1, reg2, single=False, conv=conv)
     zs = np.array(zs)
     if ignore_empty:
