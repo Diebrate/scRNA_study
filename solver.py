@@ -233,7 +233,7 @@ def sink_loss_balanced_all(a, b, costm, reg, n_iter=1000):
     tmap_bb = ot_balanced_all(b, b, costm, reg)
     def loss(t_ab, t_aa, t_bb, pa, pb, costm, reg):
         c = np.sum((t_ab - 0.5 * (t_aa + t_bb)) * costm)
-        c += get_entropy(t_aa) - 0.5 * (get_entropy(t_aa) + get_entropy(t_bb)) * reg
+        c += get_entropy(t_ab) - 0.5 * (get_entropy(t_aa) + get_entropy(t_bb)) * reg
         return c
     return np.array([loss(i, j, k, pa, pb, costm, reg) for i, j, k, pa, pb in zip(tmap_ab, tmap_aa, tmap_bb, a.transpose(), b.transpose())])
 
@@ -244,7 +244,7 @@ def sink_loss_unbalanced_all(a, b, costm, reg, reg1, reg2, n_iter=1000):
     tmap_bb = ot_unbalanced_all(b, b, costm, reg, reg1, reg2)
     def loss(t_ab, t_aa, t_bb, pa, pb, costm, reg, reg1, reg2):
         c = np.sum((t_ab - 0.5 * (t_aa + t_bb)) * costm)
-        c += get_entropy(t_aa) - 0.5 * (get_entropy(t_aa) + get_entropy(t_bb)) * reg
+        c += get_entropy(t_ab) - 0.5 * (get_entropy(t_aa) + get_entropy(t_bb)) * reg
         c += (kl_div(np.sum(t_ab, axis=1), pa) - 0.5 * (kl_div(np.sum(t_aa, axis=1), pa) + kl_div(np.sum(t_bb, axis=1), pa)) * reg1) 
         c += (kl_div(np.sum(t_ab, axis=0), pb) - 0.5 * (kl_div(np.sum(t_aa, axis=0), pb) + kl_div(np.sum(t_bb, axis=0), pb)) * reg2)
         return c
@@ -270,28 +270,29 @@ def optimal_lambda(a, b, costm, reg, reg2, reg1_min, reg1_max, step=20):
       
 # test data 1
 ##################################################
-# pa=np.repeat(1 / 5, 5)
-# pb=np.array([1, 2, 3, 4, 5]) / (1 + 2 + 3 + 4 + 5)
-# a=np.zeros((5, 100))
-# b=np.zeros((5, 100))
-# x=np.zeros((5, 100))
-# y=np.zeros((5, 100))
-# for i in range(100):
-#     a_temp = np.random.multinomial(100, pa)
-#     b_temp = np.random.multinomial(100, pa)
-#     x_temp = np.random.multinomial(100, pa)
-#     y_temp = np.random.multinomial(100, pb)
-#     a[:,i] = a_temp / np.sum(a_temp)
-#     b[:,i] = b_temp / np.sum(b_temp)
-#     x[:,i] = x_temp / np.sum(x_temp)
-#     y[:,i] = y_temp / np.sum(y_temp)
-# costm = np.random.rand(5, 5) * 10
-# costm = costm @ costm.transpose()
-# np.fill_diagonal(costm, 0)
-# reg = 10
-# reg1 = 1
-# reg2 = 1
-# res = sink_loss_unbalanced_all(a, b, costm, reg, reg1, reg2)
+pa=np.repeat(1 / 5, 5)
+pb=np.array([1, 2, 3, 4, 5]) / (1 + 2 + 3 + 4 + 5)
+a=np.zeros((5, 100))
+b=np.zeros((5, 100))
+x=np.zeros((5, 100))
+y=np.zeros((5, 100))
+for i in range(100):
+    a_temp = np.random.multinomial(100, pa)
+    b_temp = np.random.multinomial(100, pa)
+    x_temp = np.random.multinomial(100, pa)
+    y_temp = np.random.multinomial(100, pb)
+    a[:,i] = a_temp / np.sum(a_temp)
+    b[:,i] = b_temp / np.sum(b_temp)
+    x[:,i] = x_temp / np.sum(x_temp)
+    y[:,i] = y_temp / np.sum(y_temp)
+costm = np.random.rand(5, 5) * 10
+costm = costm @ costm.transpose()
+np.fill_diagonal(costm, 0)
+reg = 1
+reg1 = 1
+reg2 = 50
+res_bal = sink_loss_balanced_all(a, b, costm, reg)
+res_unbal = sink_loss_unbalanced_all(a, b, costm, reg, reg1, reg2)
 ##################################################
 
 

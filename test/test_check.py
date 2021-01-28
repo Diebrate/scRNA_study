@@ -41,14 +41,14 @@ y = np.array(y, dtype=int)
 costm = np.random.rand(k, k) 
 costm = costm @ costm.transpose()
 np.fill_diagonal(costm, 0)
-reg = 0.5
+reg = 1
 reg1 = 1
 reg2 = 50
 
-index = 88
+index = 44
 
 balanced = False
-sink = False
+sink = True
 fast = True
 
 if fast:

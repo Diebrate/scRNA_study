@@ -16,15 +16,15 @@ start_time = time.time()
 batch = False
 do_iter = False
 graph = False
-method = 'phate'
 save_fig = False
+method = 'phate'
 balanced = False
 fast = True
-sink=False
+sink = True
 
 reg = 1
 reg1 = 1
-reg2 = 1
+reg2 = 50
 
 if batch:
     df = pd.read_csv(r'..\data\proc_data\proc_df.csv')
@@ -128,7 +128,7 @@ ax.set_xticks(x)
 ax.set_xticklabels(time_names[:-1], rotation=70, size=10)
 ax.set_xlabel('Time', size=20)
 ax.set_ylabel('Rank', size=20)
-ax.set_title(r'Time vs Rank with lambda=' + str(reg) + ' and ' + method + ' embedding', size = 20)
+ax.set_title(r'Time vs Rank with ' + method + ' embedding', size = 20)
 
 print("--- %s seconds ---" % (time.time() - start_time))
 
