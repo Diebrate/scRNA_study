@@ -8,6 +8,8 @@ import test_util
 import time
 start_time = time.time()
 
+np.random.seed(1234)
+
 # test data
 n = 100
 m = 100
@@ -15,7 +17,7 @@ n_null = 100
 n_sim = 1000
 
 k = 5
-r = np.repeat(1, k)
+r = np.arange(1, k + 1)
 c = r.copy()
 r, c = r / sum(r), c / sum(c)
 a = np.zeros((n_null, n))
@@ -24,14 +26,20 @@ b = np.zeros((n_null, m))
 px = np.repeat(1, k)
 py = np.arange(1, k + 1)
 px, py = px / sum(px), py / sum(py)
+txy = np.random.rand(k, k)
+txy = np.diag(1 / np.sum(txy, axis=1)) @ txy
 x = np.zeros((n_null, n))
 y = np.zeros((n_null, m))
 
 for i in range(n_null):
     a[i] = np.random.choice(range(k), size=n, p=r)
-    b[i] = np.random.choice(range(k), size=m, p=c)
+    b[i] = np.random.choice(a[i], size=m)
+for i in range(n_null):
     x[i] = np.random.choice(range(k), size=n, p=px)
-    y[i] = np.random.choice(range(k), size=m, p=py)
+    y_temp = np.zeros(n)
+    for j in range(n):
+        y_temp[j] = np.random.choice(range(k), size=1, p=txy[int(x[i, j])])
+    y[i] = np.random.choice(y_temp, size=m)
 
 a = np.array(a, dtype=int)
 b = np.array(b, dtype=int)
@@ -45,7 +53,7 @@ reg = 1
 reg1 = 1
 reg2 = 50
 
-index = 44
+index = 11
 
 balanced = False
 sink = True

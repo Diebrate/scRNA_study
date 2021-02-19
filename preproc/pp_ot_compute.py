@@ -20,7 +20,7 @@ save_fig = False
 method = 'phate'
 balanced = False
 fast = True
-sink = True
+sink = False
 
 reg = 1
 reg1 = 1
@@ -85,7 +85,7 @@ for metric in metric_list:
                 plt.savefig(r'..\image\pp_datavis\\' + ['no_batch', 'batch'][batch] + '\ot_map\\' + metric + '\pp_louvain_cluster_map_' + metric + '_' + reform_time_name + ['_no_batch', '_batch'][batch])
         if do_iter or save_fig:    
             plt.close('all')
-n_seed = 10
+n_seed = 1
 M = test_util.get_cost_matrix(centroids, centroids, dim=dim)
 p_values = np.zeros((n_seed, T - 1))
 rank_sum = np.zeros(T - 1)

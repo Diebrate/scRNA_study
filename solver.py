@@ -70,7 +70,7 @@ def kl_div(p, a):
     return np.sum(p * np.log(p / a))
     
 
-def ot_unbalanced(a, b, costm, reg, reg1, reg2, n_iter=2000):
+def ot_unbalanced(a, b, costm, reg, reg1, reg2, n_iter=1000):
     K = np.exp(-costm / reg)
     v = np.repeat(1, len(b))
     for i in range(n_iter):
@@ -100,9 +100,9 @@ def sink_loss_unbalanced(a, b, costm, reg, reg1, reg2):
     t_aa = ot_unbalanced(a, a, costm, reg, reg1, reg2)
     t_bb = ot_unbalanced(b, b, costm, reg, reg1, reg2)
     c = np.sum((t_ab - 0.5 * (t_aa + t_bb)) * costm)
-    c += (get_entropy(t_aa) - 0.5 * (get_entropy(t_aa) + get_entropy(t_bb))) * reg
-    c += (kl_div(np.sum(t_ab, axis=1), a) - 0.5 * (kl_div(np.sum(t_aa, axis=1), a) + kl_div(np.sum(t_bb, axis=1), a))) * reg1 
-    c += (kl_div(np.sum(t_ab, axis=0), b) - 0.5 * (kl_div(np.sum(t_aa, axis=0), b) + kl_div(np.sum(t_bb, axis=0), b))) * reg2
+    c += (get_entropy(t_ab) - 0.5 * (get_entropy(t_aa) + get_entropy(t_bb))) * reg
+    c += (kl_div(np.sum(t_ab, axis=1), a) - 0.5 * (kl_div(np.sum(t_aa, axis=1), a) + kl_div(np.sum(t_bb, axis=1), b))) * reg1 
+    c += (kl_div(np.sum(t_ab, axis=0), b) - 0.5 * (kl_div(np.sum(t_aa, axis=0), a) + kl_div(np.sum(t_bb, axis=0), b))) * reg2
     return c
 
 
@@ -231,41 +231,85 @@ def sink_loss_balanced_all(a, b, costm, reg, n_iter=1000):
     tmap_ab = ot_balanced_all(a, b, costm, reg)
     tmap_aa = ot_balanced_all(a, a, costm, reg)
     tmap_bb = ot_balanced_all(b, b, costm, reg)
-    def loss(t_ab, t_aa, t_bb, pa, pb, costm, reg):
-        c = np.sum((t_ab - 0.5 * (t_aa + t_bb)) * costm)
-        c += get_entropy(t_ab) - 0.5 * (get_entropy(t_aa) + get_entropy(t_bb)) * reg
-        return c
-    return np.array([loss(i, j, k, pa, pb, costm, reg) for i, j, k, pa, pb in zip(tmap_ab, tmap_aa, tmap_bb, a.transpose(), b.transpose())])
+    def loss(t, m, r):
+        return np.sum(t * (m + r * np.log(t)))
+    return np.array([loss(i, costm, reg) - 
+                     0.5 * loss(j, costm, reg) - 
+                     0.5 * loss(k, costm, reg) for i, j, k in zip(tmap_ab, tmap_aa, tmap_bb)])
 
 
 def sink_loss_unbalanced_all(a, b, costm, reg, reg1, reg2, n_iter=1000):
     tmap_ab = ot_unbalanced_all(a, b, costm, reg, reg1, reg2)
     tmap_aa = ot_unbalanced_all(a, a, costm, reg, reg1, reg2)
     tmap_bb = ot_unbalanced_all(b, b, costm, reg, reg1, reg2)
-    def loss(t_ab, t_aa, t_bb, pa, pb, costm, reg, reg1, reg2):
-        c = np.sum((t_ab - 0.5 * (t_aa + t_bb)) * costm)
-        c += get_entropy(t_ab) - 0.5 * (get_entropy(t_aa) + get_entropy(t_bb)) * reg
-        c += (kl_div(np.sum(t_ab, axis=1), pa) - 0.5 * (kl_div(np.sum(t_aa, axis=1), pa) + kl_div(np.sum(t_bb, axis=1), pa)) * reg1) 
-        c += (kl_div(np.sum(t_ab, axis=0), pb) - 0.5 * (kl_div(np.sum(t_aa, axis=0), pb) + kl_div(np.sum(t_bb, axis=0), pb)) * reg2)
+    def loss(t, pa, pb, m, r, r1, r2):
+        c = np.sum(t * (m + r * np.log(t)))
+        c += r1 * kl_div(np.sum(t, axis=1), pa) + r2 * kl_div(np.sum(t, axis=0), pb)
         return c
-    return np.array([loss(i, j, k, pa, pb, costm, reg, reg1, reg2) for i, j, k, pa, pb in zip(tmap_ab, tmap_aa, tmap_bb, a.transpose(), b.transpose())])
+    return np.array([loss(i, pa, pb, costm, reg, reg1, reg2) - 
+                     0.5 * loss(j, pa, pa, costm, reg, reg1, reg2) - 
+                     0.5 * loss(k, pb, pb, costm, reg, reg1, reg2) for i, j, k, pa, pb in zip(tmap_ab, tmap_aa, tmap_bb, a.transpose(), b.transpose())])
 
  
 def optimal_lambda(a, b, costm, reg, reg2, reg1_min, reg1_max, step=20):
-    def obj_func(t, m, eps):
-        return np.sum(t * (m + eps * np.log(t)))
+    def obj_func(t, m):
+        return np.sum(t * m)
     reg1_arr = np.linspace(reg1_min, reg1_max, step)
     obj_val = []
     growth = []
     for reg1 in reg1_arr:
         tmap = ot_unbalanced_iter(a, b, costm, reg, reg1, reg2)
-        obj_val.append(obj_func(tmap, costm, reg))
+        obj_val.append(obj_func(tmap, costm))
         growth.append(estimate_growth1(a, b, costm, reg, reg1, reg2, conv=True))
     opt_ind = np.argmin(np.array(obj_val))
     return {'obj_func': np.array(obj_val),
             'growth_est': np.array(growth),
             'opt_lambda': reg1_arr[opt_ind],
             'opt_index': opt_ind}
+
+
+def interpolate_weight(a, b, costm, reg, reg1, reg2, h, p0=None, n_conv=1000):
+    def get_uv(a, b, costm, reg, reg1, reg2):
+        K = np.exp(-costm / reg)
+        v = np.repeat(1, len(b))
+        for i in range(1000):
+            u = (a / (K @ v)) ** (reg1 / (reg + reg1))
+            v = (b / (np.transpose(K) @ u)) ** (reg2 / (reg + reg2))
+        return u, v
+    def loss(t_ab, t_aa, t_bb, pa, pb, costm, reg, reg1, reg2):
+        c = np.sum((t_ab - 0.5 * (t_aa + t_bb)) * costm)
+        c += get_entropy(t_ab) - 0.5 * (get_entropy(t_aa) + get_entropy(t_bb)) * reg
+        c += (kl_div(np.sum(t_ab, axis=1), pa) - 0.5 * (kl_div(np.sum(t_aa, axis=1), pa) + kl_div(np.sum(t_bb, axis=1), pa)) * reg1) 
+        c += (kl_div(np.sum(t_ab, axis=0), pb) - 0.5 * (kl_div(np.sum(t_aa, axis=0), pb) + kl_div(np.sum(t_bb, axis=0), pb)) * reg2)
+        return c
+    def norm(tmap):
+        return tmap / np.sum(tmap)
+    if p0 is None:
+        p = np.repeat(1 / len(a), len(a))
+    else:
+        p = p0
+    K = np.exp(-costm / reg)
+    obj = []
+    step = 0.03
+    for i in range(n_conv):
+        uv_ap = get_uv(a, p, costm, reg, reg1, reg2)
+        uv_pb = get_uv(p, b, costm, reg, reg1, reg2)
+        uv_pp = get_uv(p, p, costm, reg, reg1, reg2)
+        uv_aa = get_uv(a, a, costm, reg, reg1, reg2)
+        uv_bb = get_uv(b, b, costm, reg, reg1, reg2)
+        gradient = h * (-np.exp(uv_ap[1]) + 0.5 * np.exp(-uv_pp[1]) + 0.5)
+        gradient += (1 - h) * (-np.exp(uv_pb[0]) + 0.5 * np.exp(-uv_pp[0]) + 0.5)
+        t_ap = norm(np.diag(uv_ap[0]) @ K @ np.diag(uv_ap[1]))
+        t_aa = norm(np.diag(uv_aa[0]) @ K @ np.diag(uv_aa[1]))
+        t_pp = norm(np.diag(uv_pp[0]) @ K @ np.diag(uv_pp[1]))
+        t_pb = norm(np.diag(uv_pb[0]) @ K @ np.diag(uv_pb[1]))
+        t_bb = norm(np.diag(uv_bb[0]) @ K @ np.diag(uv_bb[1]))
+        obj.append(h * loss(t_ap, t_aa, t_pp, a, p, costm, reg, reg1, reg2) +
+                   (1 - h) * loss(t_pb, t_pp, t_bb, p, b, costm, reg, reg1, reg2))
+        p = p - step * gradient
+        p = p / np.sum(p)
+    return {'p': p / np.sum(p),
+            'obj': obj}
 
       
 # test data 1
@@ -293,6 +337,12 @@ reg1 = 1
 reg2 = 50
 res_bal = sink_loss_balanced_all(a, b, costm, reg)
 res_unbal = sink_loss_unbalanced_all(a, b, costm, reg, reg1, reg2)
+# est = interpolate_weight(pa, pb, costm, reg, reg1, reg2, 0.5, p0=pb)
+# res = optimal_lambda(pa, pb, costm, reg, reg2, 1, 50, step=100)
+# import matplotlib.pyplot as plt
+# plt.plot(np.linspace(1, 50, 100), res['obj_func'])
+# plt.xlabel('lambda1')
+# plt.ylabel('objection function')
 ##################################################
 
 

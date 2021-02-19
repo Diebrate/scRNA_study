@@ -18,7 +18,7 @@ method = 'phate'
 conv = True
 
 reg = 1
-reg1 = 2.5
+reg1 = 1
 reg2 = 50
 
 if batch:

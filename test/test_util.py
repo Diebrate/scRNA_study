@@ -252,24 +252,6 @@ def perm_test_balanced_fast(x1, x2, costm, reg, k=None, sink=True, n_sim=1000, f
         cdf = np.copy(p_kde.cdf)
         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
         pval = decimal_trunc(1 - cdf[-1], 10)
-    # if not sink:
-    #     pval = np.mean(zs >= z)
-    #     if pval == 0:
-    #         p_kde = sm.nonparametric.KDEUnivariate(zs)
-    #         p_kde.fit()
-    #         cdf = np.copy(p_kde.cdf)
-    #         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
-    #         pval = decimal_trunc(1 - cdf[-1], 10)
-    # else:
-    #     pval1 = np.mean(zs <= z)
-    #     pval2 = np.mean(zs >= z)
-    #     pval = np.min([pval1, pval2])
-    #     if pval == 0 or pval == 1:
-    #         p_kde = sm.nonparametric.KDEUnivariate(zs)
-    #         p_kde.fit()
-    #         cdf = np.copy(p_kde.cdf)
-    #         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
-    #         pval = 2 * decimal_trunc(cdf[0 if pval1 < pval2 else -1], 10)
     if not fullreturn:
         return pval
     else:
@@ -308,25 +290,7 @@ def perm_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, sink=True,
         p_kde.fit()
         cdf = np.copy(p_kde.cdf)
         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
-    #     pval = decimal_trunc(1 - cdf[-1], 10)
-    # if not sink:
-    #     pval = np.mean(zs >= z)
-    #     if pval == 0:
-    #         p_kde = sm.nonparametric.KDEUnivariate(zs)
-    #         p_kde.fit()
-    #         cdf = np.copy(p_kde.cdf)
-    #         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
-    #         pval = decimal_trunc(1 - cdf[-1], 10)
-    # else:
-    #     pval1 = np.mean(zs <= z)
-    #     pval2 = np.mean(zs >= z)
-    #     pval = np.min([pval1, pval2])
-    #     if pval == 0 or pval == 1:
-    #         p_kde = sm.nonparametric.KDEUnivariate(zs)
-    #         p_kde.fit()
-    #         cdf = np.copy(p_kde.cdf)
-    #         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
-    #         pval = 2 * decimal_trunc(cdf[0 if pval1 < pval2 else -1], 10)
+        pval = decimal_trunc(1 - cdf[-1], 10)
     if not fullreturn:
         return pval
     else:
@@ -594,15 +558,14 @@ def simulate2d(p_start, p_trans, mean, var, size=1000):
 # costm = np.random.rand(k, k) 
 # costm = costm @ costm.transpose()
 # np.fill_diagonal(costm, 0)
-# reg = 0.5
+# reg = 1
 # reg1 = 1
 # reg2 = 50
 
 # index = 88
 
 # balanced = False
-# sink = False
-# fast = True
+# sink = True
 
 # d1 = np.zeros((k, n_null))
 # d2 = np.zeros((k, n_null))
@@ -618,7 +581,7 @@ def simulate2d(p_start, p_trans, mean, var, size=1000):
 # df = pd.DataFrame()
 # df['value'] = np.concatenate((zs_null[:, k_index], zs[:, k_index]))
 # df['source'] = np.concatenate((np.repeat('null', zs_null.shape[0]),
-#                                np.repeat('boot', zs.shape[0])))
+#                                 np.repeat('boot', zs.shape[0])))
 # sns.kdeplot(data=df, x='value', hue='source', common_norm=False)
 ##################################################
 
