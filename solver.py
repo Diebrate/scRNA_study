@@ -68,6 +68,14 @@ def get_entropy(tmap):
 
 def kl_div(p, a):
     return np.sum(p * np.log(p / a))
+
+
+def ot_balanced(a, b, costm, reg, n_iter=1000):
+    tmap = np.exp(-costm / reg)
+    for i in range(n_iter):
+        tmap = np.diag(a) @ np.diag(1 / tmap.sum(axis=1)) @ tmap
+        tmap = tmap @ np.diag(1 / tmap.sum(axis=0)) @ np.diag(b)
+    return tmap
     
 
 def ot_unbalanced(a, b, costm, reg, reg1, reg2, n_iter=1000):
@@ -78,6 +86,61 @@ def ot_unbalanced(a, b, costm, reg, reg1, reg2, n_iter=1000):
         v = (b / (np.transpose(K) @ u)) ** (reg2 / (reg + reg2))
     tmap = np.diag(u) @ K @ np.diag(v)
     return tmap / np.sum(tmap)
+
+
+def ot_unbalanced_uv(a, b, costm, reg, reg1, reg2, n_iter=1000):
+    K = np.exp(-costm / reg)
+    v = np.repeat(1, len(b))
+    for i in range(n_iter):
+        u = (a / (K @ v)) ** (reg1 / (reg + reg1))
+        v = (b / (np.transpose(K) @ u)) ** (reg2 / (reg + reg2))
+    tmap = np.diag(u) @ K @ np.diag(v)
+    return u / np.sqrt(np.sum(tmap)), v / np.sqrt(np.sum(tmap)), tmap / np.sum(tmap) 
+
+
+def ot_unbalanced_uv_all(a, b, costm, reg, reg1, reg2, n_iter=1000):
+    K = np.exp(-costm / reg)
+    if a.shape[1] == 1:
+        a = np.tile(a, b.shape[1])
+    if b.shape[1] == 1:
+        b = np.tile(b, a.shape[1])
+    n = a.shape[1]
+    v = np.ones((b.shape[0], n)) / b.shape[0]
+    for i in range(n_iter):
+        u = (a / (K @ v)) ** (reg1 / (reg + reg1))
+        v = (b / (np.transpose(K) @ u)) ** (reg2 / (reg + reg2))
+    tmap = [np.diag(i) @ K @ np.diag(j) for i, j in zip(u.transpose(), v.transpose())]
+    norm_sum = np.array([np.sum(t_temp) for t_temp in tmap])
+    for i in range(n_iter):
+        u[:, i] = u[:, i] / np.sqrt(norm_sum[i])
+        v[:, i] = v[:, i] / np.sqrt(norm_sum[i])
+    return u, v, np.array([t / np.sum(t) for t in tmap])
+
+
+def sink_gradient_unbalanced(u, v, a, b, reg, reg1, reg2):
+    da = -reg1 * np.exp(-u / reg - 1)
+    db = -reg2 * np.exp(-v / reg - 1)
+    return da, db
+
+
+def sink_loss_boot_unbalanced(px, py, a, b, costm, reg, reg1, reg2, single=True):
+    u, v, tmap = ot_unbalanced_uv(px, py, costm, reg, reg1, reg2)
+    tmap_ab = ot_unbalanced_all(a, b, costm, reg, reg1, reg2)
+    tmap_aa = ot_unbalanced_all(a, a, costm, reg, reg1, reg2)
+    tmap_bb = ot_unbalanced_all(b, b, costm, reg, reg1, reg2)
+    def loss(t, pa, pb, m, r, r1, r2):
+        c = np.sum(t * (m + r * np.log(t)))
+        c += r1 * kl_div(np.sum(t, axis=1), pa) + r2 * kl_div(np.sum(t, axis=0), pb)
+        return c
+    res_loss = np.array([loss(i, pa, pb, costm, reg, reg1, reg2) - 
+                         0.5 * loss(j, pa, pa, costm, reg, reg1, reg2) - 
+                         0.5 * loss(k, pb, pb, costm, reg, reg1, reg2) for i, j, k, pa, pb in zip(tmap_ab, tmap_aa, tmap_bb, a.transpose(), b.transpose())])
+    n_res = len(res_loss)
+    ref = sink_loss_unbalanced(px, py, costm, reg, reg1, reg2)
+    da, db = sink_gradient_unbalanced(u, v, px, py, reg, reg1, reg2)
+    for nt in range(n_res):
+        res_loss[nt] = res_loss[nt] - ref# - np.inner(a[:, nt] - px, da) - np.inner(b[:, nt] - py, db)
+    return res_loss
 
 
 def sink_loss_balanced(a, b, costm, reg):
@@ -144,13 +207,10 @@ def ot_unbalanced_all(a, b, costm, reg, reg1, reg2, n_iter=1000):
 
 
 def ot_unbalanced_iter(a, b, costm, reg, reg1, reg2, n_iter=1000, n_conv=3):
-    a_temp = a
-    b_temp = b
+    a_temp = a.copy()
     for i in range(n_conv):
-        tmap = ot_unbalanced(a_temp, b_temp, costm, reg, reg1, reg2)
-        if i < n_conv - 1:
-            a_temp = np.sum(tmap, axis=1)
-            b_temp = np.sum(tmap, axis=0)
+        tmap = ot_unbalanced(a_temp, b, costm, reg, reg1, 50)
+        a_temp = tmap.sum(axis=1)
     return tmap
 
 
@@ -249,6 +309,51 @@ def sink_loss_unbalanced_all(a, b, costm, reg, reg1, reg2, n_iter=1000):
     return np.array([loss(i, pa, pb, costm, reg, reg1, reg2) - 
                      0.5 * loss(j, pa, pa, costm, reg, reg1, reg2) - 
                      0.5 * loss(k, pb, pb, costm, reg, reg1, reg2) for i, j, k, pa, pb in zip(tmap_ab, tmap_aa, tmap_bb, a.transpose(), b.transpose())])
+
+
+def loss_balanced(a, b, costm, reg, sink=True, single=True):
+    def loss_single(t, m, r):
+        c = np.sum(t * (m + r * np.log(t)))
+        return c
+    def loss_all(t_all, m, r):
+        return np.array([loss_single(i, m, r) for i in t_all])
+    comp = ot_balanced if single else ot_balanced_all
+    loss = loss_single if single else loss_all
+    if sink:
+        tmap_ab = comp(a, b, costm, reg)
+        tmap_aa = comp(a, a, costm, reg)
+        tmap_bb = comp(b, b, costm, reg)
+        c = loss(tmap_ab, costm, reg)
+        c -= 0.5 * loss(tmap_aa, costm, reg)
+        c -= 0.5 * loss(tmap_bb, costm, reg)
+        return c
+    else:
+        tmap = comp(a, b, costm, reg)
+        return loss(tmap, a, b, costm, reg)
+
+
+def loss_unbalanced(a, b, costm, reg, reg1, reg2, sink=True, single=True):
+    def loss_single(t, pa, pb, m, r, r1, r2):
+        c = np.sum(t * (m + r * np.log(t)))
+        c += r1 * kl_div(np.sum(t, axis=1), pa) + r2 * kl_div(np.sum(t, axis=0), pb)
+        return c
+    def loss_all(t_all, pa_all, pb_all, m, r, r1, r2):
+        return np.array([loss_single(i, pa, pb, m, r, r1, r2) for i, pa, pb in zip(t_all, pa_all.transpose(), pb_all.transpose())])
+    comp = ot_unbalanced if single else ot_unbalanced_all
+    loss = loss_single if single else loss_all
+    if sink:
+        tmap_ab = comp(a, b, costm, reg, reg1, reg2)
+        tmap_ba = comp(b, a, costm, reg, reg2, reg2)
+        tmap_aa = comp(a, a, costm, reg, reg1, reg1)
+        tmap_bb = comp(b, b, costm, reg, reg2, reg2)
+        c = loss(tmap_ab, a, b, costm, reg, reg1, reg2) + loss(tmap_ba, b, a, costm, reg, reg2, reg1)
+        c -= 1 * loss(tmap_aa, a, a, costm, reg, reg1, reg1)
+        c -= 1 * loss(tmap_bb, b, b, costm, reg, reg2, reg2)
+        return c
+    else:
+        tmap_ab = comp(a, b, costm, reg, reg1, reg2)
+        tmap_ba = comp(b, a, costm, reg, reg2, reg2)
+        return loss(tmap_ab, a, b, costm, reg, reg1, reg2) + loss(tmap_ba, b, a, costm, reg, reg2, reg1)
 
  
 def optimal_lambda(a, b, costm, reg, reg2, reg1_min, reg1_max, step=20):

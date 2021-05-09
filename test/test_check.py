@@ -8,16 +8,16 @@ import test_util
 import time
 start_time = time.time()
 
-np.random.seed(1234)
+np.random.seed(123456)
 
 # test data
 n = 100
 m = 100
-n_null = 100
+n_null = 250
 n_sim = 1000
 
 k = 5
-r = np.arange(1, k + 1)
+r = np.repeat(1, k)
 c = r.copy()
 r, c = r / sum(r), c / sum(c)
 a = np.zeros((n_null, n))
@@ -53,7 +53,7 @@ reg = 1
 reg1 = 1
 reg2 = 50
 
-index = 11
+index = 20
 
 balanced = False
 sink = True

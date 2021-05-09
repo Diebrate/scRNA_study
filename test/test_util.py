@@ -4,8 +4,11 @@ import scipy.stats
 import statsmodels.api as sm
 import ot
 from scipy import spatial
+from sklearn.cluster import KMeans
 import anndata
 import solver
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 def decimal_trunc(x, n_dec):
@@ -29,6 +32,13 @@ def get_weight_no_ignore(x, k):
     for i in x:
         px[int(i)] += 1
     return px / np.sum(px)
+
+
+def get_count(x, k):
+    cx = np.zeros(k)
+    for i in x:
+        cx[int(i)] += 1
+    return cx
 
 
 def get_entropy(p, k):
@@ -258,7 +268,7 @@ def perm_test_balanced_fast(x1, x2, costm, reg, k=None, sink=True, n_sim=1000, f
         return {'zs': zs, 'pval': pval}
     
     
-def perm_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, sink=True, n_sim=1000, fullreturn=False):
+def perm_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, sink=True, n_sim=1000, fullreturn=False, n_conv=None):
     N = len(x1)
     if k is None:
         L = np.concatenate((x1, x2)).max() + 1
@@ -267,23 +277,50 @@ def perm_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, sink=True,
     L = int(L)
     p1 = get_weight(x1, L)
     p2 = get_weight(x2, L)
-    if sink:
-        z = solver.sink_loss_unbalanced(p1, p2, costm, reg, reg1, reg2)
+    if n_conv is None:
+        # if sink:
+        #     z = solver.sink_loss_unbalanced(p1, p2, costm, reg, reg1, reg2)
+        # else:
+        #     z = solver.wass_loss_unbalanced(p1, p2, costm, reg, reg1, reg2)
+        z = solver.loss_unbalanced(p1, p2, costm, reg, reg1, reg2, sink=sink, single=True)
+        data = np.concatenate((x1, x2))
+        d1 = np.zeros((L, n_sim))
+        d2 = np.zeros((L, n_sim))
+        for i in range(n_sim):
+            data_temp = np.random.permutation(data)
+            x1_temp = data_temp[:N]
+            x2_temp = data_temp[N:]
+            d1[:, i] = get_weight(x1_temp, L)
+            d2[:, i] = get_weight(x2_temp, L)
     else:
-        z = solver.wass_loss_unbalanced(p1, p2, costm, reg, reg1, reg2)
-    data = np.concatenate((x1, x2))
-    d1 = np.zeros((L, n_sim))
-    d2 = np.zeros((L, n_sim))
-    for i in range(n_sim):
-        data_temp = np.random.permutation(data)
-        x1_temp = data_temp[:N]
-        x2_temp = data_temp[N:]
-        d1[:, i] = get_weight(x1_temp, L)
-        d2[:, i] = get_weight(x2_temp, L)
-    if sink:
-        zs = solver.sink_loss_unbalanced_all(d1, d2, costm, reg, reg1, reg2)
-    else:
-        zs = solver.wass_loss_unbalanced_all(d1, d2, costm, reg, reg1, reg2)
+        p1_temp = p1.copy()
+        for j in range(n_conv):
+            tmap = solver.ot_unbalanced(p1_temp, p2, costm, reg, reg1, reg2)
+            p1_temp = tmap.sum(axis=1)
+        if sink:
+            z = solver.sink_loss_unbalanced(p1_temp, p2, costm, reg, reg1, reg2)
+        else:
+            z = solver.wass_loss_unbalanced(p1_temp, p2, costm, reg, reg1, reg2)
+        data = np.concatenate((x1, x2))
+        d1 = np.zeros((L, n_sim))
+        d2 = np.zeros((L, n_sim))
+        for i in range(n_sim):
+            data = np.random.permutation(data)
+            x1_temp = data_temp[:N]
+            x2_temp = data_temp[N:]
+            d1[:, i] = get_weight(x1_temp, L)
+            d2[:, i] = get_weight(x2_temp, L)
+        d1_temp = d1.copy()
+        for j in range(n_conv):
+            tmap_all = solver.ot_unbalanced_all(d1_temp, d2, costm, reg, reg1, reg2)
+            for it in range(n_sim):
+                d1_temp[:, it] = tmap_all[it].sum(axis=1)
+        d1 = d1_temp.copy()
+    # if sink:
+    #     zs = solver.sink_loss_unbalanced_all(d1, d2, costm, reg, reg1, reg2)
+    # else:
+    #     zs = solver.wass_loss_unbalanced_all(d1, d2, costm, reg, reg1, reg2)
+    zs = solver.loss_unbalanced(d1, d2, costm, reg, reg1, reg2, sink=sink, single=False)
     pval = np.mean(zs >= z)
     if pval == 0:
         p_kde = sm.nonparametric.KDEUnivariate(zs)
@@ -297,7 +334,7 @@ def perm_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, sink=True,
         return {'zs': zs, 'pval': pval}
     
     
-def boot_test_balanced_fast(x1, x2, costm, reg, k=None, n_sim=1000, fullreturn=False):
+def boot_test_balanced_fast(x1, x2, costm, reg, k=None, sink=True, n_sim=1000, fullreturn=False):
     N = len(x1)
     M = len(x2)
     if k is None:
@@ -307,7 +344,10 @@ def boot_test_balanced_fast(x1, x2, costm, reg, k=None, n_sim=1000, fullreturn=F
     L = int(L)
     p1 = get_weight(x1, L)
     p2 = get_weight(x2, L)
-    z = solver.wass_loss_balanced(p1, p2, costm, reg)
+    if sink:
+        z = solver.sink_loss_balanced(p1, p2, costm, reg)
+    else:
+        z = solver.wass_loss_balanced(p1, p2, costm, reg)
     d1 = np.zeros((L, n_sim))
     d2 = np.zeros((L, n_sim))
     for i in range(n_sim):
@@ -315,21 +355,31 @@ def boot_test_balanced_fast(x1, x2, costm, reg, k=None, n_sim=1000, fullreturn=F
         x2_temp = np.random.choice(x2, size=M)
         d1[:, i] = get_weight(x1_temp, L)
         d2[:, i] = get_weight(x2_temp, L)
-    zs = solver.wass_loss_balanced_all(d1, d2, costm, reg)
-    pval = np.min([np.mean(zs >= z), np.mean(zs <= z)])
-    if pval == 0 or pval == 1:
+    if sink:
+        zs = solver.sink_loss_balanced_all(d1, d2, costm, reg)
+    else:
+        zs = solver.wass_loss_balanced_all(d1, d2, costm, reg)
+    pval = np.mean(zs >= z)
+    if pval == 0:
         p_kde = sm.nonparametric.KDEUnivariate(zs)
         p_kde.fit()
         cdf = np.copy(p_kde.cdf)
         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
-        pval = decimal_trunc(cdf[0 if pval == 0 else -1], 10)
+        pval = decimal_trunc(1 - cdf[-1], 10)  
+    # pval = np.min([np.mean(zs >= z), np.mean(zs <= z)])
+    # if pval == 0 or pval == 1:
+    #     p_kde = sm.nonparametric.KDEUnivariate(zs)
+    #     p_kde.fit()
+    #     cdf = np.copy(p_kde.cdf)
+    #     cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
+    #     pval = decimal_trunc(cdf[0 if pval == 0 else -1], 10)
     if not fullreturn:
         return pval
     else:
         return {'zs': zs, 'pval': pval}
     
     
-def boot_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, n_sim=1000, fullreturn=False):
+def boot_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, sink=True, n_sim=1000, fullreturn=False, n_conv=None, scale=5):
     N = len(x1)
     M = len(x2)
     if k is None:
@@ -339,26 +389,156 @@ def boot_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, n_sim=1000
     L = int(L)
     p1 = get_weight(x1, L)
     p2 = get_weight(x2, L)
-    z = solver.wass_loss_unbalanced(p1, p2, costm, reg, reg1, reg2)
     d1 = np.zeros((L, n_sim))
     d2 = np.zeros((L, n_sim))
-    for i in range(n_sim):
-        x1_temp = np.random.choice(x1, size=N)
-        x2_temp = np.random.choice(x2, size=M)
-        d1[:, i] = get_weight(x1_temp, L)
-        d2[:, i] = get_weight(x2_temp, L)
-    zs = solver.wass_loss_unbalanced_all(d1, d2, costm, reg, reg1, reg2)
-    pval = np.min([np.mean(zs >= z), np.mean(zs <= z)])
-    if pval == 0 or pval == 1:
+    if n_conv is None:
+        z = solver.loss_unbalanced(p1, p2, costm, reg, reg1, reg2, sink=sink, single=True)
+        for i in range(n_sim):
+            x1_temp = np.random.choice(x1, size=N)
+            x2_temp = np.random.choice(x2, size=M)
+            d1[:, i] = get_weight(x1_temp, L)
+            d2[:, i] = get_weight(x2_temp, L)
+        zs = solver.loss_unbalanced(d1, d2, costm, reg, reg1, reg2, sink=sink, single=False)
+    else:
+        p1_temp = p1.copy()
+        for j in range(n_conv):
+            tmap = solver.ot_unbalanced(p1_temp, p2, costm, reg, reg1, 50)
+            p1_temp = tmap.sum(axis=1)
+        z = solver.loss_unbalanced(p1, p2, costm, reg, reg1, reg2, sink=sink, single=True)
+        # z += solver.loss_balanced(p1_temp, p2, costm, reg, sink=sink, single=True)
+        # data = np.array([])
+        # for q in range(L):
+        #     data = np.concatenate((data, np.repeat(q, int(p1_temp[q] * N))))
+        # n_sub = len(data)
+        # data = np.concatenate((data, x2))
+        for i in range(n_sim):
+            # data_temp = np.random.permutation(data)
+            # x1_temp = data_temp[:n_sub]
+            # x2_temp = data_temp[n_sub:]
+            x1_temp = np.random.choice(np.arange(L), size=N, p=p1_temp)
+            x2_temp = np.random.choice(np.arange(L), size=M, p=p2)
+            d1[:, i] = get_weight(x1_temp, L)
+            d2[:, i] = get_weight(x2_temp, L)
+        # d1_temp = d1.copy()
+        # for j in range(n_conv):
+        #     tmap_all = solver.ot_unbalanced_all(d1_temp, d2, costm, reg, reg1, reg2)
+        #     for it in range(n_sim):
+        #         d1_temp[:, it] = tmap_all[it].sum(axis=1)
+        zs = solver.loss_unbalanced(d1, d2, costm, reg, reg1, reg2, sink=sink, single=False)
+    pval = np.mean(zs >= z)
+    if pval == 0:
         p_kde = sm.nonparametric.KDEUnivariate(zs)
         p_kde.fit()
         cdf = np.copy(p_kde.cdf)
         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
-        pval = decimal_trunc(cdf[0 if pval == 0 else -1], 10)
+        pval = decimal_trunc(1 - cdf[-1], 10)  
+    # pval = np.min([np.mean(zs >= z), np.mean(zs <= z)])
+    # if pval == 0 or pval == 1:
+    #     p_kde = sm.nonparametric.KDEUnivariate(zs)
+    #     p_kde.fit()
+    #     cdf = np.copy(p_kde.cdf)
+    #     cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
+    #     pval = decimal_trunc(cdf[0 if pval == 0 else -1], 10)
     if not fullreturn:
         return pval
     else:
         return {'zs': zs, 'pval': pval}
+    
+    
+def power_test_unbalanced_fast(p, g, B, costm, reg, reg1, reg2, k, sink=True, n_sim=1000, n_sample=1000):
+    p1 = p
+    p2 = p1 * g / np.sum(p1 * g)
+    p2_alt = B.T @ p2
+    d1 = np.zeros((k, n_sim))
+    d2 = np.zeros((k, n_sim))
+    d2_alt = np.zeros((k, n_sim))
+    for i in range(n_sim):
+        x1_temp = np.random.choice(np.arange(k), size=n_sample, p=p2)
+        x2_temp = np.random.choice(np.arange(k), size=n_sample, p=p2)
+        x2_alt_temp = np.random.choice(np.arange(k), size=n_sample, p=p2_alt)
+        d1[:, i] = get_weight(x1_temp, k)
+        d2[:, i] = get_weight(x2_temp, k)
+        d2_alt[:, i] = get_weight(x2_alt_temp, k)
+    null = solver.loss_unbalanced(d1, d2, costm, reg, reg1, reg2, sink=sink, single=False)
+    alt = solver.loss_unbalanced(d1, d2_alt, costm, reg, reg1, reg2, sink=sink, single=False)
+    res = np.array([np.mean(null >= j) for j in alt])
+    return {'null': null, 'alt': alt, 'power': np.mean(res <= 0.05)}
+
+
+def est_cost(x1, x2, costm, reg, reg1, reg2, k, n_conv, sink=True, n_sim=1000):
+    N = len(x1)
+    M = len(x2)
+    p1 = get_weight(x1, k)
+    p2 = get_weight(x2, k)
+    p1_g = p1.copy()
+    for j in range(n_conv):
+        tmap = solver.ot_unbalanced(p1_g, p2, costm, reg, reg1, 50)
+        p1_g = tmap.sum(axis=1)
+    res = {'cost_g': None, 'cost_c': None, 'cost_all': None}
+    d1 = np.zeros((k, n_sim))
+    d1_g = np.zeros((k, n_sim))
+    d2 = np.zeros((k, n_sim))
+    for i in range(n_sim):
+        x1_temp = np.random.choice(np.arange(k), size=N, p=p1)
+        x1_g_temp = np.random.choice(np.arange(k), size=N, p=p1_g)
+        x2_temp = np.random.choice(np.arange(k), size=M, p=p2)
+        d1[:, i] = get_weight(x1_temp, k)
+        d1_g[:, i] = get_weight(x1_g_temp, k)
+        d2[:, i] = get_weight(x2_temp, k)
+    res['cost_g'] = solver.loss_unbalanced(d1, d1_g, costm, reg, reg1, reg2, sink=sink, single=False)
+    res['cost_c'] = solver.loss_unbalanced(d1_g, d2, costm, reg, reg2, reg2, sink=sink, single=False)
+    res['cost_all'] = solver.loss_unbalanced(d1, d2, costm, reg, reg1, reg2, sink=sink, single=False)
+    res['cost_add'] = res['cost_g'] + res['cost_c']
+    return res
+
+
+def real_cost(p1, g, B, costm, reg, reg1, reg2, k, n1, n2, sink=True, n_sim=1000):
+    p1_g = p1 * g
+    p1_g = p1_g / np.sum(p1_g)
+    p2 = B.T @ p1_g
+    res = {'cost_g': None, 'cost_c': None, 'cost_all': None}
+    d1 = np.zeros((k, n_sim))
+    d1_g = np.zeros((k, n_sim))
+    d2 = np.zeros((k, n_sim))
+    for i in range(n_sim):
+        x1_temp = np.random.choice(np.arange(k), size=n1, p=p1)
+        x1_g_temp = np.random.choice(np.arange(k), size=n1, p=p1_g)
+        x2_temp = np.random.choice(np.arange(k), size=n2, p=p2)
+        d1[:, i] = get_weight(x1_temp, k)
+        d1_g[:, i] = get_weight(x1_g_temp, k)
+        d2[:, i] = get_weight(x2_temp, k)
+    res['cost_g'] = solver.loss_unbalanced(d1, d1_g, costm, reg, reg1, reg2, sink=sink, single=False)
+    res['cost_c'] = solver.loss_unbalanced(d1_g, d2, costm, reg, reg2, reg2, sink=sink, single=False)
+    res['cost_all'] = solver.loss_unbalanced(d1, d2, costm, reg, reg1, reg2, sink=sink, single=False)
+    res['cost_add'] = res['cost_g'] + res['cost_c']
+    return res
+
+
+def est_check_unbalanced_fast(x1, x2, p1, g, B, costm, reg, reg1, reg2, k, n_conv, sink=True, n_sim=1000, n_sample=1000):
+    N = len(x1)
+    M = len(x2)
+    est_res = est_cost(x1, x2, costm, reg, reg1, reg2, k, n_conv, sink=sink)
+    real_res = real_cost(p1, g, B, costm, reg, reg1, reg2, k, n1=N, n2=M, sink=sink)
+    names = list(est_res.keys())
+    for name in names:
+        df = {'value': np.concatenate((est_res[name], real_res[name])),
+              'source': np.concatenate((np.repeat('est', n_sim), np.repeat('real', n_sample)))} 
+        plt.figure()
+        sns.kdeplot(data=df, x='value', hue='source', common_norm=False, alpha=.5, fill=True).set_title(name)
+    def dict_concat(d):
+        a = np.array([])
+        for key, item in d.items():
+            a = np.concatenate((a, item))
+        return a
+    df = {'value': dict_concat(est_res),
+          'source': np.repeat(names, n_sim)}
+    plt.figure()
+    sns.kdeplot(data=df, x='value', hue='source', common_norm=False, alpha=.5, fill=True).set_title('sim')
+    df = {'value': dict_concat(real_res),
+          'source': np.repeat(names, n_sim)}
+    plt.figure()
+    sns.kdeplot(data=df, x='value', hue='source', common_norm=False, alpha=.5, fill=True).set_title('real')
+    return est_res, real_res
     
     
 def growth_CI1(x1, x2, costm, reg, reg1, reg2, k=None, ignore_empty=True, n_sim=1000, conv=False):
@@ -479,6 +659,597 @@ def boot_test_multi(x1, x2, costm, reg, n_boot=1000, n_seed=100):
     for i in range(n_seed):
         p.append(boot_test(x1, x2, costm, reg))
     return p
+
+
+def cp_detection(data, k, costm, reg=1, reg1=1, reg2=1, balanced=True, sink=True, order=None, perm=True, n_conv=None):
+    T = data.shape[0]
+    ps = []
+    for t in range(T - 1):
+        if order is None:
+            data1 = data[t, :]
+            data2 = data[t + 1, :]
+        else:
+            data1 = data[max(0, t - order):min(T, t + order + 1), :].flatten()
+            data2 = data[max(0, t + 1 - order):min(T, t + order + 2), :].flatten()
+        if balanced:
+            if perm:
+                ps.append(perm_test_balanced_fast(data1, data2, costm, reg, sink=sink, k=k))
+            else:
+                ps.append(boot_test_balanced_fast(data1, data2, costm, reg, sink=sink, k=k))
+        else:
+            if perm:
+                ps.append(perm_test_unbalanced_fast(data1, data2, costm, reg, reg1, reg2, sink=sink, k=k))
+            else:
+                ps.append(boot_test_unbalanced_fast(data1, data2, costm, reg, reg1, reg2, sink=sink, k=k, n_conv=n_conv))
+    ps = np.array(ps)
+    return {'ps': ps, 'res': np.arange(len(ps))[ps <= 0.05]}
+
+
+def run_cusum_ot(data, k, costm, reg=1, reg1=1, reg2=1, balanced=True, sink=True, n_conv=None, full_return=False):
+    T = data.shape[0]
+    cost = []
+    for t in range(T - 1):
+        data1 = data[t, :]
+        data2 = data[t + 1, :]
+        p1 = get_weight(data1, k)
+        p2 = get_weight(data2, k)
+        if balanced:
+            cost.append(solver.loss_balanced(p1, p2, costm, reg, sink=sink))
+        else:
+            if n_conv is not None:
+                p1_g = p1.copy()
+                for i in range(n_conv):
+                    tmap = solver.ot_unbalanced(p1_g, p2, costm, reg, reg1, 10)
+                    p1_g = np.sum(tmap, axis=1)
+                    cost.append(solver.loss_unbalanced(p1, p1_g, costm, reg, reg1, reg2, sink=sink))
+            else:
+                cost.append(solver.loss_unbalanced(p1, p2, costm, reg, reg1, reg2, sink=sink))
+            # tmap = solver.ot_unbalanced(p1_g, p2, costm, reg, reg1, reg2)
+            # cost.append(np.sum(tmap * costm))
+    res = np.arange(T - 1)[cost > np.mean(cost)]
+    res = np.arange(T - 1)[cost > np.mean(cost) + 2 * np.std(cost)]
+    res = res[res != 0]
+    if full_return:
+        return res, cost
+    else:
+        return res
+    
+    
+def run_cusum(data, k, return_ll=False):
+    def get_count(x, k):
+        count = np.zeros(k)
+        for i in x:
+            count[int(i)] += 1
+        return count
+    T = data.shape[0]
+    prob = np.zeros((T, k))
+    count = np.zeros((T, k))
+    n = np.zeros(T)
+    st = np.zeros(T - 1)
+    for t in range(T):
+        prob[t, :] = get_weight(data[t, :], k)
+        count[t, :] = get_count(data[t, :], k)
+        n[t] = len(data[t, :])
+    for t in range(T - 1):
+        l1 = np.sum(count[t + 1, :] * np.log(prob[t + 1, :]))
+        l0 = np.sum(count[t + 1, :] * np.log(prob[t, :]))
+        st[t] = l1 - l0
+    st = np.cumsum(st)
+    gt = np.array([st[i] - np.min(st[:i + 1]) for i in range(len(st))])
+    diff = np.concatenate(([0], np.diff(gt)))
+    cp = []
+    diff = np.abs(np.diff(gt))
+    ref = diff.mean()
+    for i in range(len(diff) - 1):
+        if diff[i] > ref and diff[i + 1] > ref:
+            cp.append(i + 1)
+    cp = np.array(cp)
+    cp = np.arange(1, T - 1)[diff > np.mean(diff) + 2 * np.std(diff)]
+    if return_ll:
+        return cp, st, gt, diff
+    else:
+        return cp    
+    
+    
+def cp_detection_ot(data, k, costm, reg=1, reg1=1, reg2=1, return_cost=True, **kwargs):
+    cost = run_cusum_ot(data, k, costm, reg, reg1, reg2, full_return=True, **kwargs)[1]
+    # sort_ind = np.argsort(cost)[::-1]
+    # cp = []
+    # i = 0
+    # while i < len(sort_ind):
+    #     x1 = data[sort_ind[i]]
+    #     x2 = data[sort_ind[i] + 1]
+    #     loglik_null, loglik_alt, loglik_sim = ot_loglik_unbalanced(x1, x2, k, costm, reg, reg1, reg2)
+    #     l_up = np.percentile(loglik_sim, 97.5)
+    #     l_low = np.percentile(loglik_sim, 2.5)
+    #     if loglik_alt <= l_low or loglik_alt >= l_up:
+    #         cp.append(sort_ind[i])
+    #         i += 1
+    #     else:
+    #         i = len(sort_ind)
+    cp = []
+    cost_diff = np.abs(np.diff(cost))
+    ref = cost_diff.mean()
+    for i in range(len(cost_diff) - 1):
+        if cost_diff[i] > ref and cost_diff[i + 1] > ref:
+            cp.append(i + 1)
+    cp = np.array(cp)
+    cp = np.arange(data.shape[0] - 1)[cost > np.mean(cost)]
+    cp = np.arange(data.shape[0] - 1)[cost > np.mean(cost) + np.std(cost)]
+    cp = cp[cp != 0]
+    if return_cost:
+        return cp, cost
+    else:
+        return cp
+    
+    
+def ot_loglik_unbalanced(x1, x2, k, costm, reg, reg1, reg2, n_conv=7):
+    p1 = get_weight(x1, k)
+    p2 = get_weight(x2, k)
+    p1_g = p1.copy()
+    for i in range(n_conv):
+        tmap = solver.ot_unbalanced(p1, p2, costm, reg, reg1, reg2)
+        p1_g = np.sum(tmap, axis=1)
+    loglik_null = 0
+    loglik_alt = 0
+    loglik_sim = np.repeat(0, 1000)
+    data = get_count(x2, k)
+    p2_sim = np.zeros((k, 1000))
+    for j in range(1000):
+        x1_temp = np.random.choice(np.arange(k), size=len(x2), p=p1_g)
+        p2_sim[:, j] = get_weight_no_ignore(x1_temp, k)
+    for i in range(k):
+        loglik_null += data[i] * np.log(p1_g[i])
+        loglik_alt += data[i] * np.log(p2[i])
+        loglik_sim = loglik_sim + data[i] * np.log(p2_sim[i])
+    return loglik_null, loglik_alt, loglik_sim
+        
+
+def cp_detection_mc(data, k, costm, reg=1, reg1=1, reg2=1, balanced=True, sink=True, n_sim=1000, track_iter=True, order=None):
+    # change point detection designed for monte carlo data
+    M, T, n = data.shape
+    ps = np.zeros((M, T - 1))
+    for m in range(M):
+        p1 = np.zeros((k, n_sim * (T - 1)))
+        p2 = np.zeros((k, n_sim * (T - 1)))
+        p1_real = np.zeros((k, T - 1))
+        p2_real = np.zeros((k, T - 1))
+        if order is None:
+            d1 = data[m, :-1, :]
+            d2 = data[m, 1:, :]
+            for t in range(T - 1):
+                data_all = np.concatenate((d1[t, :], d2[t, :]))
+                p1_real[:, t] = get_weight(d1[t, :], k)
+                p2_real[:, t] = get_weight(d2[t, :], k)
+                for j in range(n_sim):
+                    data_temp = np.random.permutation(data_all)
+                    d1_temp = data_temp[:n]
+                    d2_temp = data_temp[n:]
+                    p1[:, t * n_sim + j] = get_weight(d1_temp, k)
+                    p2[:, t * n_sim + j] = get_weight(d2_temp, k)
+        else:
+            for t in range(T - 1):
+                data_m = data[m]
+                d1_order = data_m[max(0, t - order):max(T, t + order + 1), :].flatten()
+                d2_order = data_m[max(0, t + 1 - order):max(T, t+ order + 2), :].flatten()
+                data_all = np.concatenate((d1_order[t, :], d2_order[t, :]))
+                p1_real[:, t] = get_weight(d1_order, k)
+                p2_real[:, t] = get_weight(d2_order, k)
+                for j in range(n_sim):
+                    data_temp = np.random.permutation(data_all)
+                    d1_temp = data_temp[:n]
+                    d2_temp = data_temp[n:]
+                    p1[:, t * n_sim + j] = get_weight(d1_temp, k)
+                    p2[:, t * n_sim + j] = get_weight(d2_temp, k)
+        if sink:
+            if balanced:
+                zs = solver.sink_loss_balanced_all(p1, p2, costm, reg)
+                z = solver.sink_loss_balanced_all(p1_real, p2_real, costm, reg)
+            else:
+                zs = solver.sink_loss_unbalanced_all(p1, p2, costm, reg, reg1, reg2)
+                z = solver.sink_loss_unbalanced_all(p1_real, p2_real, costm, reg, reg1, reg2)
+        else:
+            if balanced:
+                zs = solver.wass_loss_balanced_all(p1, p2, costm, reg)
+                z = solver.wass_loss_balanced_all(p1_real, p2_real, costm, reg)
+            else:
+                zs = solver.wass_loss_unbalanced_all(p1, p2, costm, reg, reg1, reg2)
+                z = solver.wass_loss_unbalanced_all(p1_real, p2_real, costm, reg, reg1, reg2)
+        for t in range(T - 1):
+            ps[m, t] = np.mean(zs[t * n_sim : (t + 1) * n_sim] >= z[t])
+        if track_iter:
+            print('finished iteration ' + str(m))
+    return ps
+
+
+def get_cp_from_cost(cost):
+    l = len(cost)
+    est = KMeans(n_clusters=2).fit_predict(cost.reshape((-1, 1)))
+    ind = est[np.argmax(cost)]
+    return np.arange(l)[est == ind]
+
+
+def multisetting_cp_ot_cost(cost_all, T):
+    n_ns, n_nus, n_etas = cost_all.shape
+    M = cost_all[0, 0, 0].shape[0]
+    res = np.empty(cost_all.shape, dtype=object)
+    for i in range(n_ns):
+        for j in range(n_nus):
+            for k in range(n_etas):
+                res[i, j, k] = []
+                cost = cost_all[i, j, k]
+                for m in range(M):
+                    res[i, j, k].append(get_cp_from_cost(cost[m]))
+                res[i, j, k] = np.array(res[i, j, k], dtype=object)
+    return res
+
+
+def multisetting_cp_ot_cost_ng(cost_all, T):
+    n_ns, n_pwrs = cost_all.shape
+    M = cost_all[0, 0].shape[0]
+    res = np.empty(cost_all.shape, dtype=object)
+    for i in range(n_ns):
+        for j in range(n_pwrs):
+            res[i, j] = []
+            cost = cost_all[i, j]
+            for m in range(M):
+                res[i, j].append(get_cp_from_cost(cost[m]))
+            res[i, j] = np.array(res[i, j], dtype=object)
+    return res
+
+
+def multisetting_cp_ot(data_all, d, costm, reg, reg1, reg2, sink=True, balanced=False, n_conv=None):
+    n_ns, n_nus, n_etas = data_all.shape
+    M = data_all[0, 0, 0].shape[0]
+    res = np.empty(data_all.shape, dtype=object)
+    for i in range(n_ns):
+        for j in range(n_nus):
+            for k in range(n_etas):
+                res[i, j, k] = []
+                data = data_all[i, j, k]
+                for m in range(M):
+                    res[i, j, k].append(cp_detection_ot(data[m], d, costm, reg, reg1, reg2, balanced=balanced, sink=sink, n_conv=n_conv, return_cost=False))
+                res[i, j, k] = np.array(res[i, j, k], dtype=object)
+    return res
+
+
+def multisetting_cp_cs(data_all, d):
+    n_ns, n_nus, n_etas = data_all.shape
+    M = data_all[0, 0, 0].shape[0]
+    res = np.empty(data_all.shape, dtype=object)
+    for i in range(n_ns):
+        for j in range(n_nus):
+            for k in range(n_etas):
+                res[i, j, k] = []
+                data = data_all[i, j, k]
+                for m in range(M):
+                    res[i, j, k].append(run_cusum(data[m], d))
+                res[i, j, k] = np.array(res[i, j, k], dtype=object)
+    return res
+
+
+def get_oe(real, test, T=None):
+    if len(test) == 0:
+        test = np.array([0])
+    p = len(real)
+    arr = np.zeros(p)
+    for i in range(p):
+        arr[i] = np.min(np.abs(test - real[i]))
+    return np.max(arr)
+
+
+def get_ue(real, test, T=None):
+    if len(test) == 0:
+        test = np.array([0])
+    q = len(test)
+    arr = np.zeros(q)
+    for i in range(q):
+        arr[i] = np.min(np.abs(test[i] - real))
+    return np.max(arr)
+
+
+def get_e(real, test):
+    return np.abs(len(real) - len(test))
+
+
+def sum_res(data, real_cp):
+    num_cp = []
+    num_cp_ref = len(real_cp)
+    for cp in data:
+        num_cp.append(len(cp))
+    num_cp = np.array(num_cp)
+    avg_num_cp = np.mean(num_cp)
+    prob_less = np.mean(num_cp < num_cp_ref)
+    prob_more = np.mean(num_cp > num_cp_ref)
+    prob_equal = np.mean(num_cp == num_cp_ref)
+    prob_detect = []
+    for x in real_cp:
+        temp = []
+        for r in data:
+            temp.append(x in r)
+        prob_detect.append(np.mean(temp))
+    return np.concatenate(([avg_num_cp, prob_equal, prob_less, prob_more], prob_detect))
+
+
+def prf_res(data, real_cp):
+    p = []
+    r = []
+    for cp in data:
+        int_cp = np.intersect1d(cp, real_cp)
+        n_int = len(int_cp)
+        p.append(n_int / len(cp) if len(cp) > 0  else 0)
+        r.append(n_int / len(real_cp))
+    p = np.array(p)
+    r = np.array(r)
+    f = []
+    for i, j in zip(p, r):
+        if i + j > 0:
+            f.append(2 * i * j / (i + j))
+    f = np.array(f)
+    txt = '{}({})'
+    return np.array([txt.format(np.round(p.mean(), 3), np.round(p.std(), 3)),
+                     txt.format(np.round(r.mean(), 3), np.round(r.std(), 3)),
+                     txt.format(np.round(f.mean(), 3), np.round(f.std(), 3))])
+
+
+def sum_table(*data_all, real_cp, index):
+    raw = [sum_res(data, real_cp) for data in data_all]
+    names = ['prob_detect t=' + str(i) for i in real_cp]
+    names = np.concatenate((['avg_num_cp', 'prob_equal', 'prob_less', 'prob_more'], names))
+    res = pd.DataFrame(index=index, columns=names)
+    for j in range(len(raw)):
+        res.iloc[j, :] = raw[j]
+    return res
+
+
+def prf_table(*data_all, real_cp, index):
+    raw = [prf_res(data, real_cp) for data in data_all]
+    names = np.array(['precision', 'recall', 'f-score'])
+    res = pd.DataFrame(index=index, columns=names)
+    for j in range(len(raw)):
+        res.iloc[j, :] = raw[j]
+    return res
+
+
+def sum_table_all(*res_all, ns, nus, etas, real_cp, index):
+    n_ns, n_nus, n_etas = len(ns), len(nus), len(etas)
+    table_all = []
+    for i in range(n_ns):
+        table_temp_n = []
+        for j in range(n_nus):
+            table_temp_nu = []
+            for k in range(n_etas):
+                table_temp_nu.append(sum_table(*[res[i, j, k] for res in res_all], real_cp=real_cp, index=index))
+            table_temp_n.append(pd.concat(table_temp_nu, axis='columns', keys=['eta=' + str(etas[s]) for s in range(n_etas)]))
+        table_all.append(pd.concat(table_temp_n, axis='rows', keys=['nu=' + str(nus[s]) for s in range(n_nus)]))
+    table_all = pd.concat(table_all, axis='rows', keys=['n=' + str(ns[s]) for s in range(n_ns)])
+    return table_all
+
+
+def prf_table_all(*res_all, ns, nus, etas, real_cp, index):
+    n_ns, n_nus, n_etas = len(ns), len(nus), len(etas)
+    table_all = []
+    for i in range(n_ns):
+        table_temp_n = []
+        for j in range(n_nus):
+            table_temp_nu = []
+            for k in range(n_etas):
+                table_temp_nu.append(prf_table(*[res[i, j, k] for res in res_all], real_cp=real_cp, index=index))
+            table_temp_n.append(pd.concat(table_temp_nu, axis='columns', keys=['eta=' + str(etas[s]) for s in range(n_etas)]))
+        table_all.append(pd.concat(table_temp_n, axis='rows', keys=['nu=' + str(nus[s]) for s in range(n_nus)]))
+    table_all = pd.concat(table_all, axis='rows', keys=['n=' + str(ns[s]) for s in range(n_ns)])
+    return table_all
+
+
+def prf_table_all_ng(*res_all, ns, etas, real_cp, switch, index):
+    txt = 'pwr=' if switch else 'eta='
+    n_ns, n_etas = len(ns), len(etas)
+    table_all = []
+    for i in range(n_ns):
+        table_temp_n = []
+        for j in range(n_etas):
+            table_temp_n.append(prf_table(*[res[i, j] for res in res_all], real_cp=real_cp, index=index))
+        table_all.append(pd.concat(table_temp_n, axis='columns', keys=[txt + str(etas[s]) for s in range(n_etas)]))
+    table_all = pd.concat(table_all, axis='rows', keys=['n=' + str(ns[s]) for s in range(n_ns)])
+    return table_all
+
+
+def dgp(nu, eta, cp, g, d, T, n, M):
+    data_mc = []
+    sep = int(d / 2)
+    B = np.ones((d, d))
+    # B1[:, sep:] = eta
+    # B2[:, :sep] = eta
+    for i in range(d):
+        for j in range(d):
+            if i < d / 2:
+                if j >= d / 2:
+                    B[i, j] = eta / (d - sep)
+                else:
+                    B[i, j] = 0
+            else:
+                if j < d / 2:
+                    B[i, j] = eta / sep
+                else:
+                    B[i, j] = 0
+        B[i, i] = 1 - eta
+    # B = B1 = B2 = np.random.rand(d, d)
+    # B = np.ones((d, d))
+    B = np.diag(1 / B.sum(axis=1)) @ B
+    p = np.zeros((T + 1, d))
+    p[0, ] = np.repeat(1 / d, d)
+    for t in range(1, T + 1):
+        g_temp = g[t - 1, ] ** nu
+        p[t, ] = p[t - 1, ] * g_temp
+        p[t, ] = p[t, ] / np.sum(p[t, ])
+        if t - 1 in cp:
+            # p[t, ] = np.repeat(1 / d, d)
+            p[t, ] = B.T @ p[t, ]
+    data_mc = []        
+    for m in range(M):
+        data_temp = np.zeros((T + 1, n), dtype=int)
+        for t in range(T + 1):
+            data_temp[t, ] = np.random.choice(np.arange(d), size=n, p=p[t, ])
+        data_mc.append(data_temp)
+    return np.array(data_mc)
+
+
+def dgp_ng(eta, cp, d, T, n, M):
+    data_mc = []
+    sep = int(d / 2)
+    B1 = np.zeros((d, d))
+    B2 = np.zeros((d, d))
+    # B1[:, sep:] = eta
+    # B2[:, :sep] = eta
+    for i in range(d):
+        for j in range(d):
+            if i < d / 2:
+                if j >= d / 2:
+                    B1[i, j] = eta / (d - sep)
+                elif j == i:
+                    B1[i, j] = 1 - eta
+                    B2[i, j] = 1
+            else:
+                if j < d / 2:
+                    B2[i, j] = eta / sep
+                elif j == i:
+                    B1[i, j] = 1
+                    B2[i, j] = 1 - eta
+    # B = B1 = B2 = np.random.rand(d, d)
+    # B = np.ones((d, d))
+    B1 = np.diag(1 / B1.sum(axis=1)) @ B1
+    B2 = np.diag(1 / B2.sum(axis=1)) @ B2
+    p = np.zeros((T + 1, d))
+    p[0, ] = np.ones(d)
+    p[0, ] = p[0, ] / np.sum(p[0, ])
+    state = 0
+    for t in range(1, T + 1):
+        p[t, ] = p[t - 1, ]
+        if t - 1 in cp:
+            B = B1 if state % 2 == 0 else B2
+            # p[t, ] = np.repeat(1 / d, d)
+            p[t, ] = B.T @ p[t, ]
+            state += 1
+    data_mc = []        
+    for m in range(M):
+        data_temp = np.zeros((T + 1, n), dtype=int)
+        for t in range(T + 1):
+            data_temp[t, ] = np.random.choice(np.arange(d), size=n, p=p[t, ])
+        data_mc.append(data_temp)
+    return np.array(data_mc)
+
+
+def dgp_ng_switch(pwr, cp, d, T, n, M):
+    data_mc = []  
+    theta = 0
+    for m in range(M):
+        data_temp = np.zeros((T + 1, n), dtype=int)
+        for t in range(T + 1):
+            p_temp = np.ones(d)
+            if theta % 2 == 0:
+                p_temp[:d // 2] = pwr
+            else:
+                p_temp[d // 2:] = pwr
+            if t in cp:
+                theta += 1
+            p_temp = p_temp / np.sum(p_temp)
+            data_temp[t, ] = np.random.choice(np.arange(d), size=n, p=p_temp)
+        data_mc.append(data_temp)
+    return np.array(data_mc)
+
+
+def get_weight_no_ignore_mc(data_mc, T, k, matformat=True, count=True):
+    M = len(data_mc)
+    get_stat = get_count if count else get_weight
+    if matformat:
+        res = np.zeros((T + 1, k, M))
+        for m in range(M):
+            res[:, :, m] = np.array([get_stat(data_mc[m][t, :], k) for t in range(T + 1)])
+    else:
+        res = np.zeros((M, T + 1, k))
+        for m in range(M):
+            res[m, :, :] = np.array([get_stat(data_mc[m][t, :], k) for t in range(T + 1)])
+    return np.array(res)
+
+
+def get_ot_unbalanced_cost_mc(data_mc, costm, reg, reg1, reg2, sink):
+    M = len(data_mc)
+    T = data_mc.shape[1] - 1
+    res = np.zeros((M, T))
+    for m in range(M):
+        for t in range(T):
+            res[m, t] = solver.loss_unbalanced(data_mc[m, t], data_mc[m, t + 1], costm, reg, reg1, reg2, sink=sink, single=True)
+    return res
+
+
+# def multisetting_cp_detection(nus, etas, ns, d, T, M, seed, costm, reg, reg1, reg2, balanced, sink, n_conv, *args, **method):
+#     np.random.seed(seed)
+#     def cp_all(data_all, cp_method, *param):
+#         cp = []
+#         for data in data_all:
+#             cp.append(cp_method(data, *param))
+#         return np.array(cp, dtype=object)
+#     names = [*method.keys()]
+#     funcs = [*method.values()]
+#     n_func = len(names)
+#     res_total = {}
+#     for n in ns:
+#         res_n0 = {}
+#         for nu in nus:
+#             res_nu0 = []
+#             for eta in etas:
+#                 data_mc, real_cp = dgp(nu, eta, 0, d, T, n, M)
+#                 ot_temp = np.array([cp_detection_ot(data_mc[m], d, costm, reg, reg1, reg2, sink=sink, balanced=balanced, n_conv=n_conv) for m in range(M)][0], dtype=object)
+#                 cs_temp = np.array([run_cusum(data_mc[m], d) for m in range(M)], dtype=object)
+#                 res_nu0.append(sum_table(ot_temp, cs_temp, real_cp=real_cp, index=['OT', 'CS']))
+#             res_n0['nu=' + str(nu)] = pd.concat(res_nu0, axis='columns', keys=['eta=' + str(e) for e in etas])
+#         res_total['n=' + str(n)] = pd.concat(res_n0)
+#     res_total = pd.concat(res_total)    
+#     return res_total
+
+
+def sim_costm(d, low_close, high_close, low_far, high_far):
+    costm = np.zeros((d, d))
+    for i in range(d):
+        for j in range(i, d):
+            if i < d / 2:
+                if j >= d / 2:
+                    costm[i, j] = np.random.uniform(low=low_far, high=high_far)
+                    costm[j, i] = costm[i, j]
+                else:
+                    costm[i, j] = np.random.uniform(low=low_close, high=high_close)
+                    costm[j, i] = costm[i, j]
+            else:
+                if j < d / 2:
+                    costm[i, j] = np.random.uniform(low=low_far, high=high_far)
+                    costm[j, i] = costm[i, j]
+                else:
+                    costm[i, j] = np.random.uniform(low=low_close, high=high_close)
+                    costm[j, i] = costm[i, j]
+        np.fill_diagonal(costm, 0)
+    return costm
+                
+
+def constant_costm(d, low, high):
+    costm = np.zeros((d, d))
+    for i in range(d):
+        for j in range(i, d):
+            if i < d / 2:
+                if j >= d / 2:
+                    costm[i, j] = high
+                    costm[j, i] = costm[i, j]
+                else:
+                    costm[i, j] = low
+                    costm[j, i] = costm[i, j]
+            else:
+                if j < d / 2:
+                    costm[i, j] = high
+                    costm[j, i] = costm[i, j]
+                else:
+                    costm[i, j] = low
+                    costm[j, i] = costm[i, j]
+    np.fill_diagonal(costm, 0)
+    return costm
 
 
 def simulate(k, p_start, p_trans, size=1000):
