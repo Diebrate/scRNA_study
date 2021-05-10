@@ -985,6 +985,8 @@ def prf_res(data, real_cp):
     for i, j in zip(p, r):
         if i + j > 0:
             f.append(2 * i * j / (i + j))
+        else:
+            f.append(0)
     f = np.array(f)
     txt = '{}({})'
     return np.array([txt.format(np.round(p.mean(), 3), np.round(p.std(), 3)),
@@ -1156,6 +1158,86 @@ def dgp_ng_switch(pwr, cp, d, T, n, M):
             data_temp[t, ] = np.random.choice(np.arange(d), size=n, p=p_temp)
         data_mc.append(data_temp)
     return np.array(data_mc)
+
+
+def get_res_from_others(res_raw, n_ns, n_nus, n_etas, M, ftype=None):
+    if ftype == 'mat':
+        res = np.empty((n_ns, n_nus, n_etas), dtype=object)
+        for i in range(n_ns):
+            for j in range(n_nus):
+                for k in range(n_etas):
+                    res[i, j, k] = []
+                    for m in range(M):
+                        res[i, j, k].append(res_raw[i, j, k, m].flatten().astype(dtype=int))
+                    res[i, j, k] = np.array(res[i, j, k], dtype=object)
+    elif ftype == 'r':
+        res = np.empty((n_ns, n_nus, n_etas), dtype=object)
+        for i in range(n_ns):
+            for j in range(n_nus):
+                for k in range(n_etas):
+                    res[i, j, k] = []
+        i = j = k = m = 0
+        l_temp = len(res_raw)
+        temp = []
+        for ind in range(l_temp):
+            if not res_raw[ind] == 'done':
+                if not res_raw[ind] == 'null':
+                    temp.append(int(res_raw[ind]))
+            else:
+                res[i, j, k].append(np.array(temp))
+                temp = []
+                m += 1
+                if m == M:
+                    k += 1
+                    m = 0
+                if k == n_etas:
+                    j += 1
+                    k = 0
+                if j == n_nus:
+                    i += 1
+                    j = 0
+        for i in range(n_ns):
+            for j in range(n_nus):
+                for k in range(n_etas):
+                    res[i, j, k] = np.array(res[i, j, k], dtype=object)
+    return res
+
+
+def get_res_from_others_ng(res_raw, n_ns, n_temp, M, ftype=None):
+    if ftype == 'mat':
+        res = np.empty((n_ns, n_temp), dtype=object)
+        for i in range(n_ns):
+            for j in range(n_temp):
+                res[i, j] = []
+                for m in range(M):
+                    res[i, j].append(res_raw[i, j, m].flatten().astype(dtype=int))
+                res[i, j] = np.array(res[i, j], dtype=object)
+    elif ftype == 'r':
+        res = np.empty((n_ns, n_temp), dtype=object)
+        for i in range(n_ns):
+            for j in range(n_temp):
+                res[i, j] = []
+        i = j = m = 0
+        l_temp = len(res_raw)
+        temp = []
+        for ind in range(l_temp):
+            if not res_raw[ind] == 'done':
+                if not res_raw[ind] == 'null':
+                    temp.append(int(res_raw[ind]))
+            else:
+                res[i, j].append(np.array(temp))
+                temp = []
+                m += 1
+                if m == M:
+                    j += 1
+                    m = 0
+                if j == n_temp:
+                    i += 1
+                    j = 0
+        for i in range(n_ns):
+            for j in range(n_temp):
+                res[i, j] = np.array(res[i, j], dtype=object)
+    return res
 
 
 def get_weight_no_ignore_mc(data_mc, T, k, matformat=True, count=True):

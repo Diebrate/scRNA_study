@@ -8,8 +8,6 @@ start_time = time.time()
 
 np.random.seed(1030)
 
-index = ['OT', 'CS']
-
 nus = [0.25, 0.75]
 etas = [0.25, 0.75]
 ns = [250, 1000]
@@ -42,14 +40,14 @@ n_conv = 5
 seed = 99999
 
 do_sim = False
-do_load = False
+do_load = True
 do_test = False
 do_comp = True
 
-data_type = 'g'
+data_type = 'ng'
 switch = False
 
-index = ['OT', 'MN']
+index = ['OT', 'MN', 'ECP', 'WBS']
 
 if do_sim:
     if data_type == 'g':
@@ -135,16 +133,16 @@ if do_comp:
         res_ot = np.load(r'..\results\simulation\multisetting_res_ot.npy', allow_pickle=True)
         
         res_mn_raw = scipy.io.loadmat(r'..\results\simulation\multisetting_res_mn.mat')['cpt']
-        res_mn = np.empty((len(ns), len(nus), len(etas)), dtype=object)
-        for i in range(len(ns)):
-            for j in range(len(nus)):
-                for k in range(len(etas)):
-                    res_mn[i, j, k] = []
-                    for m in range(M):
-                        res_mn[i, j, k].append(res_mn_raw[i, j, k, m].flatten().astype(dtype=int))
-                    res_mn[i, j, k] = np.array(res_mn[i, j, k], dtype=object)
+        res_mn = test_util.get_res_from_others(res_mn_raw, len(ns), len(nus), len(etas), M, ftype='mat')
                     
-        res_all = test_util.prf_table_all(res_ot, res_mn, ns=ns, nus=nus, etas=etas, real_cp=cp, index=index) 
+        res_ecp_raw = np.load(r'..\results\simulation\multisetting_res_ecp.npy')
+        res_ecp = test_util.get_res_from_others(res_ecp_raw, len(ns), len(nus), len(etas), M, ftype='r')
+                    
+        res_wbs_raw = np.load(r'..\results\simulation\multisetting_res_wbs.npy')
+        res_wbs = test_util.get_res_from_others(res_wbs_raw, len(ns), len(nus), len(etas), M, ftype='r')
+                    
+        res_all = test_util.prf_table_all(res_ot, res_mn, res_ecp, res_wbs, ns=ns, nus=nus, etas=etas, real_cp=cp, index=index) 
+        res_all.to_csv(r'..\results\simulation\multisetting_res_table.csv')
     
     elif data_type == 'ng':
         
@@ -153,15 +151,16 @@ if do_comp:
         res_ot = np.load(r'..\results\simulation\multisetting_res_ot_ng.npy', allow_pickle=True)
         
         res_mn_raw = scipy.io.loadmat(r'..\results\simulation\multisetting_res_mn_ng.mat')['cpt']
-        res_mn = np.empty((len(ns), n_temp), dtype=object)
-        for i in range(len(ns)):
-            for j in range(n_temp):
-                res_mn[i, j] = []
-                for m in range(M):
-                    res_mn[i, j].append(res_mn_raw[i, j, m].flatten().astype(dtype=int))
-                res_mn[i, j] = np.array(res_mn[i, j], dtype=object)
+        res_mn = test_util.get_res_from_others_ng(res_mn_raw, len(ns), n_temp, M, ftype='mat')
         
-        res_all = test_util.prf_table_all_ng(res_ot, res_mn, ns=ns, etas=temps, real_cp=cp, switch=switch, index=index)
+        res_ecp_raw = np.load(r'..\results\simulation\multisetting_res_ecp_ng.npy')
+        res_ecp = test_util.get_res_from_others_ng(res_ecp_raw, len(ns), n_temp, M, ftype='r')
+        
+        res_wbs_raw = np.load(r'..\results\simulation\multisetting_res_wbs_ng.npy')
+        res_wbs = test_util.get_res_from_others_ng(res_wbs_raw, len(ns), n_temp, M, ftype='r')
+        
+        res_all = test_util.prf_table_all_ng(res_ot, res_mn, res_ecp, res_wbs, ns=ns, etas=temps, real_cp=cp, switch=switch, index=index)
+        res_all.to_csv(r'..\results\simulation\multisetting_res_table_ng.csv')
 
     pd.set_option('display.max_columns', None)
     print(res_all)
