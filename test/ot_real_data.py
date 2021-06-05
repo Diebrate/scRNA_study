@@ -16,8 +16,10 @@ batch = False
 do_iter = False
 graph = False
 save_fig = False
-method = 'raw'
-sink = False
+method = 'phate'
+sink = True
+win_size = 2
+weight = 'exp'
 
 reg = 1
 reg1 = 1
@@ -50,11 +52,9 @@ for metric in metric_list:
         p_temp = test_util.get_weight(df.loc[df.time_index==t, 'cluster'].to_numpy(), k=k)
         probs.append(p_temp)
     probs = np.array(probs)
-    probs_bef = probs[:T - 1, ]
-    probs_aft = probs[1:, ]
     dim = centroids.shape[1]
     costm = test_util.get_cost_matrix(centroids, centroids, dim=dim)
-    cost = solver.loss_unbalanced(probs_bef.T, probs_aft.T, costm, reg, reg1, reg2, sink=sink, single=False)
+    cost = solver.loss_unbalanced_local(probs, costm, reg, reg1, reg2, sink=sink, win_size=win_size, weight=weight)
     
 cp = test_util.get_cp_from_cost(cost)
 
@@ -64,11 +64,12 @@ f = np.poly1d(z)
 
 fig, ax = plt.subplots(figsize=(10,8))
 
-ax.plot(x, f(x))
+# ax.plot(x, f(x))
+ax.plot(x, cost)
 ax.set_xticks(x)
 ax.set_xticklabels(time_names[:-1], rotation=70, size=10)
 ax.set_xlabel('Time', size=20)
-ax.set_ylabel('Rank', size=20)
+ax.set_ylabel('Cost', size=20)
 ax.set_title(r'Time vs Cost with ' + method + ' embedding', size = 20)
 
 print("--- %s seconds ---" % (time.time() - start_time))

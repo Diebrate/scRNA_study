@@ -10,6 +10,7 @@ import solver
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+import peak_detection
 
 def decimal_trunc(x, n_dec):
     x_temp = x * (10 ** n_dec)
@@ -539,7 +540,34 @@ def est_check_unbalanced_fast(x1, x2, p1, g, B, costm, reg, reg1, reg2, k, n_con
     plt.figure()
     sns.kdeplot(data=df, x='value', hue='source', common_norm=False, alpha=.5, fill=True).set_title('real')
     return est_res, real_res
-    
+
+def offset_growth(prob_all, costm, reg, reg1, conv=True):
+    prob_bef = prob_all[:-1, ].T
+    prob_aft = prob_all[1:, ].T
+    gs = 1 + solver.estimate_growth1(prob_bef, prob_aft, costm, reg, reg1, 50, single=False, conv=conv)    
+    def backward(g, p):
+        p0 = np.array(p / g)
+        return p0 / np.sum(p0)
+    prob_offset = np.zeros(prob_all.shape)
+    prob_offset[0, ] = prob_all[0, ]
+    T = prob_all.shape[0]
+    for t in range(1, T):
+        t_temp = t
+        p_temp = prob_all[t, ]
+        while t_temp > 0:
+            p_temp = backward(gs[t - 1, ], p_temp)
+            t_temp -= 1
+        prob_offset[t, ] = p_temp
+    return prob_offset
+
+
+def offset_growth_mc(prob_all_mc, costm, reg, reg1, conv=True):
+    M = len(prob_all_mc)
+    res = []
+    for m in range(M):
+        res.append(offset_growth(prob_all_mc[m], costm, reg, reg1, conv=conv))
+    return np.array(res)
+            
     
 def growth_CI1(x1, x2, costm, reg, reg1, reg2, k=None, ignore_empty=True, n_sim=1000, conv=False):
     N = len(x1)
@@ -862,14 +890,17 @@ def cp_detection_mc(data, k, costm, reg=1, reg1=1, reg2=1, balanced=True, sink=T
     return ps
 
 
-def get_cp_from_cost(cost):
+def get_cp_from_cost(cost, win_size=None):
     l = len(cost)
-    est = KMeans(n_clusters=2).fit_predict(cost.reshape((-1, 1)))
-    ind = est[np.argmax(cost)]
-    return np.arange(l)[est == ind]
+    if win_size is not None:
+        return peak_detection.peaks_detection(cost, np.arange(1, l + 1), min_snr=0.005)[0]
+    else:
+        est = KMeans(n_clusters=2).fit_predict(cost.reshape((-1, 1)))
+        ind = est[np.argmax(cost)]
+        return np.arange(l)[est == ind]
 
 
-def multisetting_cp_ot_cost(cost_all, T):
+def multisetting_cp_ot_cost(cost_all, T, win_size=None):
     n_ns, n_nus, n_etas = cost_all.shape
     M = cost_all[0, 0, 0].shape[0]
     res = np.empty(cost_all.shape, dtype=object)
@@ -879,12 +910,12 @@ def multisetting_cp_ot_cost(cost_all, T):
                 res[i, j, k] = []
                 cost = cost_all[i, j, k]
                 for m in range(M):
-                    res[i, j, k].append(get_cp_from_cost(cost[m]))
+                    res[i, j, k].append(get_cp_from_cost(cost[m], win_size=win_size))
                 res[i, j, k] = np.array(res[i, j, k], dtype=object)
     return res
 
 
-def multisetting_cp_ot_cost_ng(cost_all, T):
+def multisetting_cp_ot_cost_ng(cost_all, T, win_size=None):
     n_ns, n_pwrs = cost_all.shape
     M = cost_all[0, 0].shape[0]
     res = np.empty(cost_all.shape, dtype=object)
@@ -893,7 +924,7 @@ def multisetting_cp_ot_cost_ng(cost_all, T):
             res[i, j] = []
             cost = cost_all[i, j]
             for m in range(M):
-                res[i, j].append(get_cp_from_cost(cost[m]))
+                res[i, j].append(get_cp_from_cost(cost[m], win_size=win_size))
             res[i, j] = np.array(res[i, j], dtype=object)
     return res
 
@@ -971,11 +1002,26 @@ def sum_res(data, real_cp):
     return np.concatenate(([avg_num_cp, prob_equal, prob_less, prob_more], prob_detect))
 
 
-def prf_res(data, real_cp):
+def prf_res(data, real_cp, win_size=None):
     p = []
     r = []
+    def hit_cp(cp_raw, real_cp, win_size=None):
+        if win_size is None:
+            return np.intersect1d(cp_raw, real_cp)
+        else:
+            cp_new = []
+            l = len(cp_raw)
+            for cp_temp in real_cp:
+                find = False
+                i = 0
+                while (not find) and i < l:
+                    if cp_raw[i] > cp_temp - win_size and cp_raw[i] < cp_temp + win_size:
+                        cp_new.append(cp_temp)
+                        find = True
+                    i += 1
+            return cp_new
     for cp in data:
-        int_cp = np.intersect1d(cp, real_cp)
+        int_cp = hit_cp(cp_raw=cp, real_cp=real_cp, win_size=win_size)
         n_int = len(int_cp)
         p.append(n_int / len(cp) if len(cp) > 0  else 0)
         r.append(n_int / len(real_cp))
@@ -1004,8 +1050,8 @@ def sum_table(*data_all, real_cp, index):
     return res
 
 
-def prf_table(*data_all, real_cp, index):
-    raw = [prf_res(data, real_cp) for data in data_all]
+def prf_table(*data_all, real_cp, index, win_size=None):
+    raw = [prf_res(data, real_cp, win_size=win_size) for data in data_all]
     names = np.array(['precision', 'recall', 'f-score'])
     res = pd.DataFrame(index=index, columns=names)
     for j in range(len(raw)):
@@ -1028,7 +1074,7 @@ def sum_table_all(*res_all, ns, nus, etas, real_cp, index):
     return table_all
 
 
-def prf_table_all(*res_all, ns, nus, etas, real_cp, index):
+def prf_table_all(*res_all, ns, nus, etas, real_cp, index, win_size=None):
     n_ns, n_nus, n_etas = len(ns), len(nus), len(etas)
     table_all = []
     for i in range(n_ns):
@@ -1036,24 +1082,37 @@ def prf_table_all(*res_all, ns, nus, etas, real_cp, index):
         for j in range(n_nus):
             table_temp_nu = []
             for k in range(n_etas):
-                table_temp_nu.append(prf_table(*[res[i, j, k] for res in res_all], real_cp=real_cp, index=index))
+                table_temp_nu.append(prf_table(*[res[i, j, k] for res in res_all], real_cp=real_cp, index=index, win_size=win_size))
             table_temp_n.append(pd.concat(table_temp_nu, axis='columns', keys=['eta=' + str(etas[s]) for s in range(n_etas)]))
         table_all.append(pd.concat(table_temp_n, axis='rows', keys=['nu=' + str(nus[s]) for s in range(n_nus)]))
     table_all = pd.concat(table_all, axis='rows', keys=['n=' + str(ns[s]) for s in range(n_ns)])
     return table_all
 
 
-def prf_table_all_ng(*res_all, ns, etas, real_cp, switch, index):
+def prf_table_all_ng(*res_all, ns, etas, real_cp, switch, index, win_size=None):
     txt = 'pwr=' if switch else 'eta='
     n_ns, n_etas = len(ns), len(etas)
     table_all = []
     for i in range(n_ns):
         table_temp_n = []
         for j in range(n_etas):
-            table_temp_n.append(prf_table(*[res[i, j] for res in res_all], real_cp=real_cp, index=index))
+            table_temp_n.append(prf_table(*[res[i, j] for res in res_all], real_cp=real_cp, index=index, win_size=win_size))
         table_all.append(pd.concat(table_temp_n, axis='columns', keys=[txt + str(etas[s]) for s in range(n_etas)]))
     table_all = pd.concat(table_all, axis='rows', keys=['n=' + str(ns[s]) for s in range(n_ns)])
     return table_all
+
+
+def dgp_with_prob(prob, n, matformat=True):
+    M, T, d = prob.shape
+    if matformat:
+        res = np.zeros((T, d, M))
+        for m in range(M):
+            res[:, :, m] = np.array([n * prob[m, t, ] for t in range(T)])
+    else:
+        res = np.zeros((M, T, d))
+        for m in range(M):
+            res[m, :, :] = np.array([n * prob[m, t, ] for t in range(T)])
+    return np.array(res)
 
 
 def dgp(nu, eta, cp, g, d, T, n, M):
@@ -1262,6 +1321,17 @@ def get_ot_unbalanced_cost_mc(data_mc, costm, reg, reg1, reg2, sink):
         for t in range(T):
             res[m, t] = solver.loss_unbalanced(data_mc[m, t], data_mc[m, t + 1], costm, reg, reg1, reg2, sink=sink, single=True)
     return res
+
+
+def get_ot_unbalanced_cost_local_mc(data_mc, costm, reg, reg1, reg2, sink, win_size=None, weight=None):
+    if win_size == 1:
+        return get_ot_unbalanced_cost_mc(data_mc, costm, reg, reg1, reg2, sink=sink)
+    else:
+        M = len(data_mc)
+        res = []
+        for m in range(M):
+            res.append(solver.loss_unbalanced_local(data_mc[m], costm, reg, reg1, reg2, sink=sink, win_size=win_size, weight=weight))
+        return np.array(res)
 
 
 # def multisetting_cp_detection(nus, etas, ns, d, T, M, seed, costm, reg, reg1, reg2, balanced, sink, n_conv, *args, **method):

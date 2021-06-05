@@ -219,11 +219,10 @@ def ot_unbalanced_all_iter(a, b, costm, reg, reg1, reg2, n_iter=1000, n_conv=3):
     b_temp = b
     l = a.shape[0]
     for i in range(n_conv):
-        tmap = ot_unbalanced_all(a_temp, b_temp, costm, reg, reg1, reg2)
+        tmap = ot_unbalanced_all(a_temp, b, costm, reg, reg1, reg2)
         if i < n_conv - 1:
             for j in range(l):
                 a_temp[:, j] = np.sum(tmap[j], axis=1)
-                b_temp[:, j] = np.sum(tmap[j], axis=0)
     return tmap
 
 
@@ -347,13 +346,44 @@ def loss_unbalanced(a, b, costm, reg, reg1, reg2, sink=True, single=True):
         tmap_aa = comp(a, a, costm, reg, reg1, reg1)
         tmap_bb = comp(b, b, costm, reg, reg2, reg2)
         c = loss(tmap_ab, a, b, costm, reg, reg1, reg2) + loss(tmap_ba, b, a, costm, reg, reg2, reg1)
-        c -= 1 * loss(tmap_aa, a, a, costm, reg, reg1, reg1)
-        c -= 1 * loss(tmap_bb, b, b, costm, reg, reg2, reg2)
+        c -= 1 * loss(tmap_aa, a, a, costm, reg, reg1, reg2)
+        c -= 1 * loss(tmap_bb, b, b, costm, reg, reg1, reg2)
         return c
     else:
         tmap_ab = comp(a, b, costm, reg, reg1, reg2)
         tmap_ba = comp(b, a, costm, reg, reg2, reg2)
         return loss(tmap_ab, a, b, costm, reg, reg1, reg2) + loss(tmap_ba, b, a, costm, reg, reg2, reg1)
+
+
+def loss_unbalanced_local(probs, costm, reg, reg1, reg2, sink=True, win_size=None, weight=None):
+    T = probs.shape[0] - 1
+    cost_win = np.zeros((T + 1, T + 1))
+    for t in range(T + 1):
+        lower = np.min([T, t + 1])
+        upper = np.min([T, t + 2 * win_size - 1])
+        if lower != upper:
+            for j in range(lower, upper + 1):
+                cost_win[t, j] = loss_unbalanced(probs[t, ], probs[j, ], costm, reg, reg1, reg2, sink=sink, single=True)
+    res = np.zeros(T)
+    for t in range(T):
+        lower = np.max([0, t - win_size + 1])
+        upper = np.min([T, t + win_size])
+        cost_temp = []
+        weight_temp = []
+        for i in range(lower, t + 1):
+            for j in range(t + 1, upper + 1):
+                cost_temp.append(cost_win[i, j])
+                if weight is None:
+                    weight_temp.append(1)
+                elif weight == 'exp':
+                    weight_temp.append(np.exp(-((i - t) ** 2) - ((j - t - 1) ** 2)))
+                elif weight == 'frac':
+                    weight_temp.append(1 / ((1 + np.abs(i - t)) * (1 + np.abs(j - t - 1))))
+        cost_temp = np.array(cost_temp)
+        weight_temp = np.array(weight_temp)
+        res[t] = np.mean(cost_temp)
+        # res[t] = np.sum(cost_temp * weight_temp / weight_temp.sum())
+    return res
 
  
 def optimal_lambda(a, b, costm, reg, reg2, reg1_min, reg1_max, step=20):

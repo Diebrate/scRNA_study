@@ -1,4 +1,6 @@
 clc
+offset = true;
+if
 load ..\..\results\simulation\multisetting_data_ng.mat
 n_ns = length(ns); n_etas = length(etas);
 T = double(T); p = double(p);
