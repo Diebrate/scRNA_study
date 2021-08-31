@@ -541,6 +541,7 @@ def est_check_unbalanced_fast(x1, x2, p1, g, B, costm, reg, reg1, reg2, k, n_con
     sns.kdeplot(data=df, x='value', hue='source', common_norm=False, alpha=.5, fill=True).set_title('real')
     return est_res, real_res
 
+
 def offset_growth(prob_all, costm, reg, reg1, conv=True):
     prob_bef = prob_all[:-1, ].T
     prob_aft = prob_all[1:, ].T
@@ -893,7 +894,12 @@ def cp_detection_mc(data, k, costm, reg=1, reg1=1, reg2=1, balanced=True, sink=T
 def get_cp_from_cost(cost, win_size=None):
     l = len(cost)
     if win_size is not None:
-        return peak_detection.peaks_detection(cost, np.arange(1, l + 1), min_snr=0.005)[0]
+        trimmed_cost = cost[(win_size-1):(l - win_size)]
+        res = peak_detection.peaks_detection(trimmed_cost, np.arange(1, l + 1), min_snr=0.001)[0]
+        res = np.array(res)
+        # res = res[res > win_size]
+        # return res[res < l - win_size]
+        return res + win_size - 1
     else:
         est = KMeans(n_clusters=2).fit_predict(cost.reshape((-1, 1)))
         ind = est[np.argmax(cost)]
@@ -1102,7 +1108,96 @@ def prf_table_all_ng(*res_all, ns, etas, real_cp, switch, index, win_size=None):
     return table_all
 
 
+def get_prob_all(T, d, g, cp, eta, nu):
+    p = np.zeros((T + 1, d))
+    p[0, ] = np.repeat(1 / d, d)
+    state = 0
+    for t in range(1, T + 1):
+        g_temp = g[t - 1, ] ** nu
+        p[t, ] = p[t - 1, ] * g_temp
+        p[t, ] = p[t, ] / np.sum(p[t, ])
+        if t - 1 in cp:
+            if state % 2 == 0:
+                for d_temp in range(d):
+                    if d_temp % 2 == 0:
+                        p[t, d_temp] *= np.exp(eta)
+                    else:
+                        p[t, d_temp] *= np.exp(-eta)
+            else:
+                for d_temp in range(d):
+                    if d_temp % 2 == 0:
+                        p[t, d_temp] *= np.exp(-eta)
+                    else:
+                        p[t, d_temp] *= np.exp(eta)
+            p[t, ] = p[t, ] / np.sum(p[t, ])
+            state += 1
+    return p
+
+
+def get_prob_ng_all(T, d, cp, eta):
+    p = np.zeros((T + 1, d))
+    p[0, ] = np.ones(d)
+    p[0, ] = p[0, ] / np.sum(p[0, ])
+    state = 0
+    for t in range(1, T + 1):
+        p[t, ] = p[t - 1, ]
+        if t - 1 in cp:
+            if state % 2 == 0:
+                for d_temp in range(d):
+                    if d_temp % 2 == 0:
+                        p[t, d_temp] *= np.exp(eta)
+                    else:
+                        p[t, d_temp] *= np.exp(-eta)
+            else:
+                for d_temp in range(d):
+                    if d_temp % 2 == 0:
+                        p[t, d_temp] *= np.exp(-eta)
+                    else:
+                        p[t, d_temp] *= np.exp(eta)
+            p[t, ] = p[t, ] / np.sum(p[t, ])
+            state += 1
+    return p
+
+
+def check_unbalanced_tmap_conv(p1, p2, d, costm, reg, reg1, reg2, n_size, n_sim):
+    p1_sim = np.zeros((n_sim, d))
+    p2_sim = np.zeros((n_sim, d))
+    for i in range(n_sim):
+        p1_sim[i, ] = np.random.multinomial(n_size, p1) / n_size
+        p2_sim[i, ] = np.random.multinomial(n_size, p2) / n_size
+    tmap_sim = solver.ot_unbalanced_all(p1_sim.T, p2_sim.T, costm, reg, reg1, reg2)
+    tmap_real = solver.ot_unbalanced(p1, p2, costm, reg, reg1, reg2)
+    diff_sim = tmap_compare_mc(tmap_sim, tmap_real)
+    return {'p1_sim': p1_sim,
+            'p2_sim': p2_sim,
+            'tmap_sim': tmap_sim,
+            'tmap_real': tmap_real,
+            'diff': diff_sim}
+
+
+def plot_diff(*res, ns, title=None):
+    plt.figure()
+    for i in range(len(ns)):
+        sns.kdeplot(res[i]['diff'], label='n = ' + str(ns[i]))
+    plt.legend()
+    plt.xlabel('diff')
+    if title is not None:
+        plt.title(title)
+
+
+def dgp_from_prob(prob, n, T, d, M):
+    # generate data given probability vectors over all times
+    data_mc = []
+    for m in range(M):
+        data_temp = np.zeros((T + 1, n), dtype=int)
+        for t in range(T + 1):
+            data_temp[t, ] = np.random.choice(np.arange(d), size=n, p=prob[t, ])
+        data_mc.append(data_temp)
+    return np.array(data_mc)
+    
+
 def dgp_with_prob(prob, n, matformat=True):
+    # rescaling of probability vectors
     M, T, d = prob.shape
     if matformat:
         res = np.zeros((T, d, M))
@@ -1155,6 +1250,40 @@ def dgp(nu, eta, cp, g, d, T, n, M):
     return np.array(data_mc)
 
 
+def dgp_no_trans(nu, eta, cp, g, d, T, n, M):
+    data_mc = []
+    sep = int(d / 2)
+    p = np.zeros((T + 1, d))
+    p[0, ] = np.repeat(1 / d, d)
+    state = 0
+    for t in range(1, T + 1):
+        g_temp = g[t - 1, ] ** nu
+        p[t, ] = p[t - 1, ] * g_temp
+        p[t, ] = p[t, ] / np.sum(p[t, ])
+        if t - 1 in cp:
+            if state % 2 == 0:
+                for d_temp in range(d):
+                    if d_temp < sep:
+                        p[t, d_temp] *= np.exp(eta)
+                    else:
+                        p[t, d_temp] *= np.exp(-eta)
+            else:
+                for d_temp in range(d):
+                    if d_temp < sep:
+                        p[t, d_temp] *= np.exp(-eta)
+                    else:
+                        p[t, d_temp] *= np.exp(eta)
+            p[t, ] = p[t, ] / np.sum(p[t, ])
+            state += 1
+    data_mc = []        
+    for m in range(M):
+        data_temp = np.zeros((T + 1, n), dtype=int)
+        for t in range(T + 1):
+            data_temp[t, ] = np.random.choice(np.arange(d), size=n, p=p[t, ])
+        data_mc.append(data_temp)
+    return np.array(data_mc)
+
+
 def dgp_ng(eta, cp, d, T, n, M):
     data_mc = []
     sep = int(d / 2)
@@ -1190,6 +1319,39 @@ def dgp_ng(eta, cp, d, T, n, M):
             B = B1 if state % 2 == 0 else B2
             # p[t, ] = np.repeat(1 / d, d)
             p[t, ] = B.T @ p[t, ]
+            state += 1
+    data_mc = []        
+    for m in range(M):
+        data_temp = np.zeros((T + 1, n), dtype=int)
+        for t in range(T + 1):
+            data_temp[t, ] = np.random.choice(np.arange(d), size=n, p=p[t, ])
+        data_mc.append(data_temp)
+    return np.array(data_mc)
+
+
+def dgp_ng_no_trans(eta, cp, d, T, n, M):
+    data_mc = []
+    sep = int(d / 2)
+    p = np.zeros((T + 1, d))
+    p[0, ] = np.ones(d)
+    p[0, ] = p[0, ] / np.sum(p[0, ])
+    state = 0
+    for t in range(1, T + 1):
+        p[t, ] = p[t - 1, ]
+        if t - 1 in cp:
+            if state % 2 == 0:
+                for d_temp in range(d):
+                    if d_temp < sep:
+                        p[t, d_temp] *= np.exp(eta)
+                    else:
+                        p[t, d_temp] *= np.exp(-eta)
+            else:
+                for d_temp in range(d):
+                    if d_temp < sep:
+                        p[t, d_temp] *= np.exp(-eta)
+                    else:
+                        p[t, d_temp] *= np.exp(eta)
+            p[t, ] = p[t, ] / np.sum(p[t, ])
             state += 1
     data_mc = []        
     for m in range(M):
@@ -1324,7 +1486,7 @@ def get_ot_unbalanced_cost_mc(data_mc, costm, reg, reg1, reg2, sink):
 
 
 def get_ot_unbalanced_cost_local_mc(data_mc, costm, reg, reg1, reg2, sink, win_size=None, weight=None):
-    if win_size == 1:
+    if win_size is None:
         return get_ot_unbalanced_cost_mc(data_mc, costm, reg, reg1, reg2, sink=sink)
     else:
         M = len(data_mc)
@@ -1332,6 +1494,22 @@ def get_ot_unbalanced_cost_local_mc(data_mc, costm, reg, reg1, reg2, sink, win_s
         for m in range(M):
             res.append(solver.loss_unbalanced_local(data_mc[m], costm, reg, reg1, reg2, sink=sink, win_size=win_size, weight=weight))
         return np.array(res)
+
+
+def get_ot_unbalanced_cost_mm_mc(data_mc, costm, reg, reg_phi, coeff, win_size, n_iter=10, exp_threshold=10):
+    M = len(data_mc)
+    res = []
+    for m in range(M):
+        res.append(solver.multimarg_unbalanced_ot_all(data_mc[m], costm, reg, reg_phi, win_size, coeff=coeff, n_iter=n_iter, exp_threshold=exp_threshold))
+    return np.array(res)
+
+
+def tmap_compare_mc(tmap_all, real_tmap):
+    M = tmap_all.shape[0]
+    res = np.zeros(M)
+    for m in range(M):
+        res[m] = np.sum(np.abs(tmap_all[m] - real_tmap))
+    return res
 
 
 # def multisetting_cp_detection(nus, etas, ns, d, T, M, seed, costm, reg, reg1, reg2, balanced, sink, n_conv, *args, **method):

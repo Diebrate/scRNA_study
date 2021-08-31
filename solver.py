@@ -216,7 +216,6 @@ def ot_unbalanced_iter(a, b, costm, reg, reg1, reg2, n_iter=1000, n_conv=3):
 
 def ot_unbalanced_all_iter(a, b, costm, reg, reg1, reg2, n_iter=1000, n_conv=3):
     a_temp = a
-    b_temp = b
     l = a.shape[0]
     for i in range(n_conv):
         tmap = ot_unbalanced_all(a_temp, b, costm, reg, reg1, reg2)
@@ -224,6 +223,45 @@ def ot_unbalanced_all_iter(a, b, costm, reg, reg1, reg2, n_iter=1000, n_conv=3):
             for j in range(l):
                 a_temp[:, j] = np.sum(tmap[j], axis=1)
     return tmap
+
+
+def ot_unbalanced_all_mc(prob_mc, costm, reg, reg1, reg2):
+    M, T, d = prob_mc.shape
+    tmap_mc = []
+    for m in range(M):
+        tmap_mc.append(ot_unbalanced_all(prob_mc[m, :T - 1, :].T, prob_mc[m, 1:, :].T, costm, reg, reg1, reg2))
+    return np.array(tmap_mc)
+
+
+def norm_tmap(tmap):
+    tm = np.array(tmap)
+    return np.diag(1 / tm.sum(axis=1)) @ tm
+
+
+def est_trans(ref, raw):
+    d = ref.shape[0]
+    p_trans = np.zeros((d, d))
+    for i in range(d):
+        ref_one = ref[i, i]
+        ref_zero = (ref[i, ].sum() - ref_one) / (d - 1)
+        for j in range(d):
+            p_temp = (raw[i, j] - ref_zero) / (ref_one - ref_zero)
+            if p_temp < 0:
+                p_temp = 0
+            elif p_temp > 1:
+                p_temp = 1
+            p_trans[i, j] = p_temp
+    return norm_tmap(p_trans)
+
+
+def est_trans_from_ts(ref_ts, raw, cp):
+    T = len(ref_ts)
+    ref = []
+    for t in range(T):
+        if t in cp:
+            ref.append(norm_tmap(ref_ts[t]))
+    ref = np.array(ref)
+    return est_trans(ref.mean(axis=0), norm_tmap(raw))
 
 
 def solve_growth(tmap, p, by_row=True):
@@ -235,7 +273,7 @@ def solve_growth(tmap, p, by_row=True):
     A = np.diag(marg) * A
     A = A - np.diag(p)
     b = p - marg
-    return np.linalg.solve(A, b)
+    return 1 + np.linalg.solve(A, b)
 
 
 def estimate_growth1(a, b, costm, reg, reg1, reg2, n_iter=1000, single=True, conv=False):
@@ -355,7 +393,35 @@ def loss_unbalanced(a, b, costm, reg, reg1, reg2, sink=True, single=True):
         return loss(tmap_ab, a, b, costm, reg, reg1, reg2) + loss(tmap_ba, b, a, costm, reg, reg2, reg1)
 
 
-def loss_unbalanced_local(probs, costm, reg, reg1, reg2, sink=True, win_size=None, weight=None):
+def loss_unbalanced_partial(a, b, costm, reg, reg1, reg2, sink=True):
+    def loss(t, pa, pb, m, r, r1, r2):
+        c = np.sum(t * (m + r * np.log(t)))
+        c += r1 * kl_div(np.sum(t, axis=1), pa) + r2 * kl_div(np.sum(t, axis=0), pb)
+        return c
+    def get_sub(m, ia, ib):
+        res = m[ia, :]
+        return res[:, ib]
+    d = costm.shape[0]
+    ind_a = np.arange(d)[a > 0]
+    ind_b = np.arange(d)[b > 0]
+    a_sub = a[a > 0]
+    b_sub = b[b > 0]
+    if sink:
+        tmap_ab = ot_unbalanced(a_sub, b_sub, get_sub(costm, ind_a, ind_b), reg, reg1, reg2)
+        tmap_ba = ot_unbalanced(b_sub, a_sub, get_sub(costm, ind_b, ind_a), reg, reg2, reg2)
+        tmap_aa = ot_unbalanced(a_sub, a_sub, get_sub(costm, ind_a, ind_a), reg, reg1, reg1)
+        tmap_bb = ot_unbalanced(b_sub, b_sub, get_sub(costm, ind_b, ind_b), reg, reg2, reg2)
+        c = loss(tmap_ab, a_sub, b_sub, get_sub(costm, ind_a, ind_b), reg, reg1, reg2) + loss(tmap_ba, b_sub, a_sub, get_sub(costm, ind_b, ind_a), reg, reg2, reg1)
+        c -= 1 * loss(tmap_aa, a_sub, a_sub, get_sub(costm, ind_a, ind_a), reg, reg1, reg2)
+        c -= 1 * loss(tmap_bb, b_sub, b_sub, get_sub(costm, ind_b, ind_b), reg, reg1, reg2)
+        return c
+    else:
+        tmap_ab = ot_balanced(a_sub, b_sub, get_sub(costm, ind_a, ind_b), reg, reg1, reg2)
+        tmap_ba = ot_balanced(b_sub, a_sub, get_sub(costm, ind_b, ind_a), reg, reg2, reg2)
+        return loss(tmap_ab, a_sub, b_sub, get_sub(costm, ind_a, ind_b), reg, reg1, reg2) + loss(tmap_ba, b_sub, a_sub, get_sub(costm, ind_b, ind_a), reg, reg2, reg1)
+    
+
+def loss_unbalanced_local(probs, costm, reg, reg1, reg2, sink=True, win_size=None, weight=None, partial=False):
     T = probs.shape[0] - 1
     cost_win = np.zeros((T + 1, T + 1))
     for t in range(T + 1):
@@ -363,7 +429,10 @@ def loss_unbalanced_local(probs, costm, reg, reg1, reg2, sink=True, win_size=Non
         upper = np.min([T, t + 2 * win_size - 1])
         if lower != upper:
             for j in range(lower, upper + 1):
-                cost_win[t, j] = loss_unbalanced(probs[t, ], probs[j, ], costm, reg, reg1, reg2, sink=sink, single=True)
+                if partial:
+                    cost_win[t, j] = loss_unbalanced_partial(probs[t, ], probs[j, ], costm, reg, reg1, reg2, sink=sink)
+                else:    
+                    cost_win[t, j] = loss_unbalanced(probs[t, ], probs[j, ], costm, reg, reg1, reg2, sink=sink, single=True)
     res = np.zeros(T)
     for t in range(T):
         lower = np.max([0, t - win_size + 1])
@@ -377,12 +446,97 @@ def loss_unbalanced_local(probs, costm, reg, reg1, reg2, sink=True, win_size=Non
                     weight_temp.append(1)
                 elif weight == 'exp':
                     weight_temp.append(np.exp(-((i - t) ** 2) - ((j - t - 1) ** 2)))
+                elif weight == 'exp1':
+                    weight_temp.append(np.exp(-(np.abs(i - t)) - (np.abs(j - t - 1))))
                 elif weight == 'frac':
                     weight_temp.append(1 / ((1 + np.abs(i - t)) * (1 + np.abs(j - t - 1))))
+                elif weight == 'lin':
+                    weight_temp.append((win_size - np.abs(i - t)) * (win_size - np.abs(j - t - 1)))
         cost_temp = np.array(cost_temp)
         weight_temp = np.array(weight_temp)
         res[t] = np.mean(cost_temp)
-        # res[t] = np.sum(cost_temp * weight_temp / weight_temp.sum())
+        res[t] = np.sum(cost_temp * weight_temp / weight_temp.sum())
+    return res
+
+
+def multimarg_unbalanced_ot(*margs, costm, reg, reg_phi, coeff, n_iter=10, exp_threshold=10, loss_only=False):
+    def prox(reg, reg_kl, value):
+        return value * (reg_kl / (reg_kl + reg))
+    J = len(margs)
+    d = costm.shape[0]
+    u = np.ones((J, d))
+    alpha_out = np.ones((J, d))
+    alpha_in = np.ones((J, d))
+    K = []
+    for j in range(J):
+        K.append(np.exp(-coeff[j] * costm / reg))
+    for j in range(J)[::-1]:
+        alpha_out[j, ] = K[j] @ u[j, ]
+    for n in range(n_iter):
+        for j in range(J):
+            ind_temp = np.arange(J)[np.arange(J) != j]
+            alpha_out_temp = alpha_out[ind_temp, ]
+            alpha_in[j, ] = K[j] @ (np.ones(d) * alpha_out_temp.prod(axis=0))
+            if np.max(np.abs(np.log(alpha_in[j, ]))) > exp_threshold:
+                K[j] = K[j] @ np.diag(np.exp(prox(reg, reg_phi * coeff[j], -np.log(alpha_in[j, ]))))
+                alpha_in[j, ] = np.ones(d)
+            u[j, ] = np.exp(prox(reg, reg_phi * coeff[j], np.log(margs[j]) - np.log(alpha_in[j, ])))
+        for j in range(J)[::-1]:
+            alpha_out[j, ] = K[j] @ u[j, ]
+            if np.max(np.abs(np.sum(np.log(alpha_out), axis=0))) > exp_threshold:
+                for j in range(J):
+                    ind_temp = np.arange(J)[np.arange(J) != j]
+                    alpha_out_temp = alpha_out[ind_temp, ]
+                    K[j] = K[j] @ np.diag(alpha_out_temp.prod(axis=0))
+                alpha_out = np.ones((J, d))
+    K_mat = np.zeros(tuple(np.repeat(d, J + 1)))
+    u_mat = np.zeros(tuple(np.repeat(d, J + 1)))
+    cost_mat = np.zeros(tuple(np.repeat(d, J + 1)))
+    coords = list(np.ndindex(*np.repeat(d, J + 1)))
+    for coord in coords:
+        k_temp = 1
+        u_temp = 1
+        marg_coord = coord[:-1]
+        res_coord = coord[-1]
+        for j in range(J):
+            k_temp *= K[j][marg_coord[j], res_coord]
+            u_temp *= u[j, marg_coord[j]]
+        K_mat[coord] = k_temp
+        u_mat[coord] = u_temp
+        cost_mat[coord] = np.sum(np.array(coeff) * costm[marg_coord, res_coord])
+    tmap = K_mat * u_mat
+    tmap = tmap / tmap.sum()
+    res = tmap.sum(axis=tuple(np.arange(J)))
+    loss = np.sum(cost_mat * tmap) + reg * np.sum(tmap * np.log(tmap))
+    for j in range(J):
+        loss += coeff[j] * reg_phi * kl_div(margs[j], res)
+    if loss_only:
+        return loss
+    else:
+        return {'tmap': tmap,
+                'res': res,
+                'loss': loss}
+    
+    
+def multimarg_unbalanced_ot_all(probs, costm, reg, reg_phi, win_size, coeff=None, n_iter=10, exp_threshold=10):
+    T = probs.shape[0] - 1
+    res = np.zeros(T)
+    for t in range(T):
+        lower = np.max([0, t - win_size + 1])
+        upper = np.min([T, t + win_size])
+        margs = [probs[ind] for ind in range(lower, upper + 1)]
+        if coeff is None:
+            coeff_temp = np.ones(len(margs))
+        elif coeff == 'exp':
+            coeff_temp = np.array([np.exp(-np.min(np.abs(t_temp - np.array([t, t + 1]))) ** 2) for t_temp in range(lower, upper + 1)])
+        elif coeff == 'exp1':
+            coeff_temp = np.array([np.exp(-np.min(np.abs(t_temp - np.array([t, t + 1])))) for t_temp in range(lower, upper + 1)])
+        elif coeff == 'frac':
+            coeff_temp = np.array([1 / (1 + np.min(np.abs(t_temp - np.array([t, t + 1])))) for t_temp in range(lower, upper + 1)])
+        elif coeff == 'lin':
+            coeff_temp = np.array([win_size - np.min(np.abs(t_temp - np.array([t, t + 1]))) for t_temp in range(lower, upper + 1)])
+        coeff_temp = coeff_temp / np.sum(coeff_temp)
+        res[t] = multimarg_unbalanced_ot(*margs, costm=costm, reg=reg, reg_phi=reg_phi, coeff=coeff_temp, n_iter=n_iter, exp_threshold=exp_threshold, loss_only=True)
     return res
 
  
@@ -449,29 +603,29 @@ def interpolate_weight(a, b, costm, reg, reg1, reg2, h, p0=None, n_conv=1000):
       
 # test data 1
 ##################################################
-pa=np.repeat(1 / 5, 5)
-pb=np.array([1, 2, 3, 4, 5]) / (1 + 2 + 3 + 4 + 5)
-a=np.zeros((5, 100))
-b=np.zeros((5, 100))
-x=np.zeros((5, 100))
-y=np.zeros((5, 100))
-for i in range(100):
-    a_temp = np.random.multinomial(100, pa)
-    b_temp = np.random.multinomial(100, pa)
-    x_temp = np.random.multinomial(100, pa)
-    y_temp = np.random.multinomial(100, pb)
-    a[:,i] = a_temp / np.sum(a_temp)
-    b[:,i] = b_temp / np.sum(b_temp)
-    x[:,i] = x_temp / np.sum(x_temp)
-    y[:,i] = y_temp / np.sum(y_temp)
-costm = np.random.rand(5, 5) * 10
-costm = costm @ costm.transpose()
-np.fill_diagonal(costm, 0)
-reg = 1
-reg1 = 1
-reg2 = 50
-res_bal = sink_loss_balanced_all(a, b, costm, reg)
-res_unbal = sink_loss_unbalanced_all(a, b, costm, reg, reg1, reg2)
+# pa=np.repeat(1 / 5, 5)
+# pb=np.array([1, 2, 3, 4, 5]) / (1 + 2 + 3 + 4 + 5)
+# a=np.zeros((5, 100))
+# b=np.zeros((5, 100))
+# x=np.zeros((5, 100))
+# y=np.zeros((5, 100))
+# for i in range(100):
+#     a_temp = np.random.multinomial(100, pa)
+#     b_temp = np.random.multinomial(100, pa)
+#     x_temp = np.random.multinomial(100, pa)
+#     y_temp = np.random.multinomial(100, pb)
+#     a[:,i] = a_temp / np.sum(a_temp)
+#     b[:,i] = b_temp / np.sum(b_temp)
+#     x[:,i] = x_temp / np.sum(x_temp)
+#     y[:,i] = y_temp / np.sum(y_temp)
+# costm = np.random.rand(5, 5) * 10
+# costm = costm @ costm.transpose()
+# np.fill_diagonal(costm, 0)
+# reg = 1
+# reg1 = 1
+# reg2 = 50
+# res_bal = sink_loss_balanced_all(a, b, costm, reg)
+# res_unbal = sink_loss_unbalanced_all(a, b, costm, reg, reg1, reg2)
 # est = interpolate_weight(pa, pb, costm, reg, reg1, reg2, 0.5, p0=pb)
 # res = optimal_lambda(pa, pb, costm, reg, reg2, 1, 50, step=100)
 # import matplotlib.pyplot as plt
