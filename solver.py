@@ -1,5 +1,18 @@
 import numpy as np
 
+
+def compute_dist(*data, dim, single=True):
+    if single:
+        x = y = data[0]
+    else:
+        x = data[0]
+        y = data[1]
+    costm = np.zeros((x.shape[0], y.shape[0]))
+    for d in range(dim):
+        costm += np.power(np.subtract.outer(x[:, d], y[:, d]), 2)
+    return np.sqrt(costm)
+    
+
 def ot_entropy(a, b, costm, reg, n_iter=1000):
     tmap = np.exp(-costm / reg)
     for i in range(n_iter):
@@ -419,43 +432,181 @@ def loss_unbalanced_partial(a, b, costm, reg, reg1, reg2, sink=True):
         tmap_ab = ot_balanced(a_sub, b_sub, get_sub(costm, ind_a, ind_b), reg, reg1, reg2)
         tmap_ba = ot_balanced(b_sub, a_sub, get_sub(costm, ind_b, ind_a), reg, reg2, reg2)
         return loss(tmap_ab, a_sub, b_sub, get_sub(costm, ind_a, ind_b), reg, reg1, reg2) + loss(tmap_ba, b_sub, a_sub, get_sub(costm, ind_b, ind_a), reg, reg2, reg1)
+
+
+def loss_unbalanced_cont(x0, x1, reg, reg1, reg2, dim, sink=True):
+    def loss(t, pa, pb, m, r, r1, r2):
+        c = np.sum(t * (m + r * np.log(t)))
+        c += r1 * kl_div(np.sum(t, axis=1), pa) + r2 * kl_div(np.sum(t, axis=0), pb)
+        return c
+    a = np.repeat(1 / len(x0), len(x0))
+    b = np.repeat(1 / len(x1), len(x1))
+    if sink:
+        costm_ab = compute_dist(x0, x1, dim=dim, single=False)
+        costm_ba = costm_ab.T
+        costm_aa = compute_dist(x0, dim=dim)
+        costm_bb = compute_dist(x1, dim=dim)
+        tmap_ab = ot_unbalanced(a, b, costm_ab, reg, reg1, reg2)
+        tmap_ba = ot_unbalanced(b, a, costm_ba, reg, reg2, reg2)
+        tmap_aa = ot_unbalanced(a, a, costm_aa, reg, reg1, reg1)
+        tmap_bb = ot_unbalanced(b, b, costm_bb, reg, reg2, reg2)
+        c = loss(tmap_ab, a, b, costm_ab, reg, reg1, reg2) + loss(tmap_ba, b, a, costm_ba, reg, reg2, reg1)
+        c -= 1 * loss(tmap_aa, a, a, costm_aa, reg, reg1, reg2)
+        c -= 1 * loss(tmap_bb, b, b, costm_bb, reg, reg1, reg2)
+        return c
+    else:
+        tmap_ab = comp(a, b, costm_ab, reg, reg1, reg2)
+        tmap_ba = comp(b, a, costm_ba, reg, reg2, reg2)
+        return loss(tmap_ab, a, b, costm_ab, reg, reg1, reg2) + loss(tmap_ba, b, a, costm_ba, reg, reg2, reg1)
     
 
-def loss_unbalanced_local(probs, costm, reg, reg1, reg2, sink=True, win_size=None, weight=None, partial=False):
+def loss_unbalanced_all_local(probs, costm, reg, reg1, reg2, sink=True, win_size=1, weight=None, partial=False):
     T = probs.shape[0] - 1
-    cost_win = np.zeros((T + 1, T + 1))
-    for t in range(T + 1):
-        lower = np.min([T, t + 1])
-        upper = np.min([T, t + 2 * win_size - 1])
-        if lower != upper:
+    res = np.zeros(T)
+    if win_size > 1:
+        cost_win = np.zeros((T + 1, T + 1))
+        for t in range(T + 1):
+            lower = np.min([T, t + 1])
+            upper = np.min([T, t + 2 * win_size - 1])
             for j in range(lower, upper + 1):
                 if partial:
                     cost_win[t, j] = loss_unbalanced_partial(probs[t, ], probs[j, ], costm, reg, reg1, reg2, sink=sink)
                 else:    
                     cost_win[t, j] = loss_unbalanced(probs[t, ], probs[j, ], costm, reg, reg1, reg2, sink=sink, single=True)
+        for t in range(T):
+            lower = np.max([0, t - win_size + 1])
+            upper = np.min([T, t + win_size])
+            cost_temp = []
+            weight_temp = []
+            for i in range(lower, t + 1):
+                for j in range(t + 1, upper + 1):
+                    cost_temp.append(cost_win[i, j])
+                    if weight is None:
+                        weight_temp.append(1)
+                    elif weight == 'exp':
+                        weight_temp.append(np.exp(-((i - t) ** 2) - ((j - t - 1) ** 2)))
+                    elif weight == 'exp1':
+                        weight_temp.append(np.exp(-(np.abs(i - t)) - (np.abs(j - t - 1))))
+                    elif weight == 'frac':
+                        weight_temp.append(1 / ((1 + np.abs(i - t)) * (1 + np.abs(j - t - 1))))
+                    elif weight == 'lin':
+                        weight_temp.append((win_size - np.abs(i - t)) * (win_size - np.abs(j - t - 1)))
+            cost_temp = np.array(cost_temp)
+            weight_temp = np.array(weight_temp)
+            res[t] = np.mean(cost_temp)
+            res[t] = np.sum(cost_temp * weight_temp / weight_temp.sum())
+    else:
+        res = loss_unbalanced(probs[:T, ], probs[1:, ], costm, reg, reg1, reg2, sink=sink, single=False)
+    return res
+
+
+def loss_unbalanced_all_local_cont(data, labels, reg, reg1, reg2, sink=True, win_size=1, weight=None):
+    T = np.max(labels)
     res = np.zeros(T)
-    for t in range(T):
-        lower = np.max([0, t - win_size + 1])
-        upper = np.min([T, t + win_size])
-        cost_temp = []
-        weight_temp = []
-        for i in range(lower, t + 1):
-            for j in range(t + 1, upper + 1):
-                cost_temp.append(cost_win[i, j])
-                if weight is None:
-                    weight_temp.append(1)
-                elif weight == 'exp':
-                    weight_temp.append(np.exp(-((i - t) ** 2) - ((j - t - 1) ** 2)))
-                elif weight == 'exp1':
-                    weight_temp.append(np.exp(-(np.abs(i - t)) - (np.abs(j - t - 1))))
-                elif weight == 'frac':
-                    weight_temp.append(1 / ((1 + np.abs(i - t)) * (1 + np.abs(j - t - 1))))
-                elif weight == 'lin':
-                    weight_temp.append((win_size - np.abs(i - t)) * (win_size - np.abs(j - t - 1)))
-        cost_temp = np.array(cost_temp)
-        weight_temp = np.array(weight_temp)
-        res[t] = np.mean(cost_temp)
-        res[t] = np.sum(cost_temp * weight_temp / weight_temp.sum())
+    dim = data.shape[1]
+    if win_size > 1:
+        cost_win = np.zeros((T + 1, T + 1))
+        for t in range(T + 1):
+            lower = np.min([T, t + 1])
+            upper = np.min([T, t + 2 * win_size - 1])
+            for j in range(lower, upper + 1):
+                x_t = data[labels == t]
+                x_j = data[labels == j]
+                cost_win[t, j] = loss_unbalanced_cont(x_t, x_j, reg, reg1, reg2, dim=dim, sink=sink)
+        for t in range(T):
+            lower = np.max([0, t - win_size + 1])
+            upper = np.min([T, t + win_size])
+            cost_temp = []
+            weight_temp = []
+            for i in range(lower, t + 1):
+                for j in range(t + 1, upper + 1):
+                    cost_temp.append(cost_win[i, j])
+                    if weight is None:
+                        weight_temp.append(1)
+                    elif weight == 'exp':
+                        weight_temp.append(np.exp(-((i - t) ** 2) - ((j - t - 1) ** 2)))
+                    elif weight == 'exp1':
+                        weight_temp.append(np.exp(-(np.abs(i - t)) - (np.abs(j - t - 1))))
+                    elif weight == 'frac':
+                        weight_temp.append(1 / ((1 + np.abs(i - t)) * (1 + np.abs(j - t - 1))))
+                    elif weight == 'lin':
+                        weight_temp.append((win_size - np.abs(i - t)) * (win_size - np.abs(j - t - 1)))
+            cost_temp = np.array(cost_temp)
+            weight_temp = np.array(weight_temp)
+            res[t] = np.mean(cost_temp)
+            res[t] = np.sum(cost_temp * weight_temp / weight_temp.sum())
+    else:
+        for t in range(T):
+            x_0 = data[labels == t]
+            x_1 = data[labels == t + 1]
+            p_0 = np.repeat(1 / len(x_0), len(x_0))
+            p_1 = np.repeat(1 / len(x_1), len(x_1))
+            costm_t = compute_dist(x_0, x_1, dim=dim, single=False)
+            res[t] = loss_unbalanced(p_0, p_1, costm_t, reg, reg1, reg2, sink=sink, single=True)
+    return res
+
+
+def compute_cost_disc(probs, costm, reg, reg1, reg2, sink=True, partial=False, max_win_size=4):
+    T = probs.shape[0] - 1
+    res = np.zeros(T)
+    cost_win = np.zeros((T + 1, T + 1))
+    for t in range(T + 1):
+        lower = t
+        upper = np.min([T, t + 2 * max_win_size - 1])
+        for j in range(lower, upper + 1):
+            p_t = probs[t, :]
+            p_j = probs[j, :]
+            if partial:
+                cost_win[t, j] = loss_unbalanced_partial(p_t, p_j, costm, reg, reg1, reg2, sink=sink)
+            else:
+                cost_win[t, j] = loss_unbalanced(p_t, p_j, costm, reg, reg1, reg2, sink=sink)
+    return cost_win
+
+
+def compute_cost_cont(data, labels, reg, reg1, reg2, sink=True, max_win_size=4):
+    T = np.max(labels)
+    res = np.zeros(T)
+    dim = data.shape[1]
+    cost_win = np.zeros((T + 1, T + 1))
+    for t in range(T + 1):
+        lower = t
+        upper = np.min([T, t + 2 * max_win_size - 1])
+        for j in range(lower, upper + 1):
+            x_t = data[labels == t]
+            x_j = data[labels == j]
+            cost_win[t, j] = loss_unbalanced_cont(x_t, x_j, reg, reg1, reg2, dim=dim, sink=sink)
+    return cost_win
+
+
+def get_weighted_cost(cost, weight, win_size=1):
+    T = cost.shape[0] - 1
+    res = np.zeros(T)
+    if win_size > 1:
+        for t in range(T):
+            lower = np.max([0, t - win_size + 1])
+            upper = np.min([T, t + win_size])
+            cost_temp = []
+            weight_temp = []
+            for i in range(lower, t + 1):
+                for j in range(t + 1, upper + 1):
+                    cost_temp.append(cost[i, j])
+                    if weight is None:
+                        weight_temp.append(1)
+                    elif weight == 'exp':
+                        weight_temp.append(np.exp(-((i - t) ** 2) - ((j - t - 1) ** 2)))
+                    elif weight == 'exp1':
+                        weight_temp.append(np.exp(-(np.abs(i - t)) - (np.abs(j - t - 1))))
+                    elif weight == 'frac':
+                        weight_temp.append(1 / ((1 + np.abs(i - t)) * (1 + np.abs(j - t - 1))))
+                    elif weight == 'lin':
+                        weight_temp.append((win_size - np.abs(i - t)) * (win_size - np.abs(j - t - 1)))
+            cost_temp = np.array(cost_temp)
+            weight_temp = np.array(weight_temp)
+            res[t] = np.mean(cost_temp)
+            res[t] = np.sum(cost_temp * weight_temp / weight_temp.sum())
+    else:
+        for t in range(T):
+            res[t] = cost[t, t + 1]
     return res
 
 

@@ -896,10 +896,11 @@ def get_cp_from_cost(cost, win_size=None):
     if win_size is not None:
         trimmed_cost = cost[(win_size-1):(l - win_size)]
         res = peak_detection.peaks_detection(trimmed_cost, np.arange(1, l + 1), min_snr=0.001)[0]
+        # res = peak_detection.peaks_detection(cost, np.arange(1, l + 1), min_snr=0.001)[0]
         res = np.array(res)
-        # res = res[res > win_size]
+        # res = res[res >= win_size - 1]
         # return res[res < l - win_size]
-        return res + win_size - 1
+        return res + win_size - 1 
     else:
         est = KMeans(n_clusters=2).fit_predict(cost.reshape((-1, 1)))
         ind = est[np.argmax(cost)]
@@ -1492,7 +1493,7 @@ def get_ot_unbalanced_cost_local_mc(data_mc, costm, reg, reg1, reg2, sink, win_s
         M = len(data_mc)
         res = []
         for m in range(M):
-            res.append(solver.loss_unbalanced_local(data_mc[m], costm, reg, reg1, reg2, sink=sink, win_size=win_size, weight=weight))
+            res.append(solver.loss_unbalanced_all_local(data_mc[m], costm, reg, reg1, reg2, sink=sink, win_size=win_size, weight=weight))
         return np.array(res)
 
 

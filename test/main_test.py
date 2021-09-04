@@ -31,7 +31,7 @@ for t in range(T):
 M = 30
 
 costm = test_util.constant_costm(d, 1, 2)
-reg = .01
+reg = 0.05
 reg1 = 1
 reg2 = 1
 sink = True
@@ -46,13 +46,13 @@ do_test = True
 do_comp = True
 
 ### shortcut setup
-# do_sim = do_load = do_test = do_comp = False
+do_sim = do_load = do_test = do_comp = True
 ###
 
 data_type = 'g'
-offset = False
-win_size = 3
-weight = None
+offset = True
+win_size = 2
+weight = 'frac'
 switch = False
 multimarg = False
 
@@ -75,8 +75,8 @@ do_cost = False
 n_sim = 100
 ns_size = [100, 1000, 10000]
 time_check = 20
-nu_check = 1
-eta_check = 1
+nu_check = 0
+eta_check = 0
 
 real_prob = np.empty((len(nus), len(etas)), dtype=object)
 real_tmap = np.empty((len(nus), len(etas)), dtype=object)
@@ -114,14 +114,14 @@ if do_cost:
     fig, ax = plt.subplots(nrows=len(nus), ncols=len(etas), figsize = (10, 10))
     for i in range(len(nus)):
         for j in range(len(etas)):
-            real_cost = solver.loss_unbalanced_local(real_prob[i, j], costm, reg, reg1, reg2, win_size=win_size, sink=sink)
+            real_cost = solver.loss_unbalanced_all_local(real_prob[i, j], costm, reg, reg1, reg2, win_size=win_size, sink=sink)
             p_low_n = np.zeros((T + 1, d))
             p_high_n = np.zeros((T + 1, d))
             for t in range(T + 1):
                 p_low_n[t, ] = np.random.multinomial(ns[0], pvals=real_prob[i, j][t, ]) / ns[0]
                 p_high_n[t, ] = np.random.multinomial(ns[1], pvals=real_prob[i, j][t, ]) / ns[1]
-            cost_low_n = solver.loss_unbalanced_local(p_low_n, costm, reg, reg1, reg2, win_size=win_size, sink=sink, weight=weight)
-            cost_high_n = solver.loss_unbalanced_local(p_high_n, costm, reg, reg1, reg2, win_size=win_size, sink=sink, weight=weight)
+            cost_low_n = solver.loss_unbalanced_all_local(p_low_n, costm, reg, reg1, reg2, win_size=win_size, sink=sink, weight=weight)
+            cost_high_n = solver.loss_unbalanced_all_local(p_high_n, costm, reg, reg1, reg2, win_size=win_size, sink=sink, weight=weight)
             ax[i, j].plot(real_cost, label='real')
             ax[i, j].plot(cost_low_n, label='low n')
             ax[i, j].plot(cost_high_n, label='high n')
@@ -133,14 +133,14 @@ if do_cost:
     
     fig_ng, ax_ng = plt.subplots(nrows=len(etas), figsize = (8, 8))
     for i in range(len(etas)):
-        real_cost_ng = solver.loss_unbalanced_local(real_prob_ng[i], costm, reg, reg1, reg2, win_size=win_size, sink=sink)
+        real_cost_ng = solver.loss_unbalanced_all_local(real_prob_ng[i], costm, reg, reg1, reg2, win_size=win_size, sink=sink)
         p_low_n_ng = np.zeros((T + 1, d))
         p_high_n_ng = np.zeros((T + 1, d))
         for t in range(T + 1):
             p_low_n_ng[t, ] = np.random.multinomial(ns[0], pvals=real_prob_ng[i][t, ]) / ns[0]
             p_high_n_ng[t, ] = np.random.multinomial(ns[1], pvals=real_prob_ng[i][t, ]) / ns[1]
-        cost_low_n_ng = solver.loss_unbalanced_local(p_low_n_ng, costm, reg, reg1, reg2, win_size=win_size, sink=sink, weight=weight)
-        cost_high_n_ng = solver.loss_unbalanced_local(p_high_n_ng, costm, reg, reg1, reg2, win_size=win_size, sink=sink, weight=weight)
+        cost_low_n_ng = solver.loss_unbalanced_all_local(p_low_n_ng, costm, reg, reg1, reg2, win_size=win_size, sink=sink, weight=weight)
+        cost_high_n_ng = solver.loss_unbalanced_all_local(p_high_n_ng, costm, reg, reg1, reg2, win_size=win_size, sink=sink, weight=weight)
         ax_ng[i].plot(real_cost_ng, label='real')
         ax_ng[i].plot(cost_low_n_ng, label='low n')
         ax_ng[i].plot(cost_high_n_ng, label='high n')
