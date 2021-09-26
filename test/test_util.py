@@ -1624,6 +1624,90 @@ def simulate2d(p_start, p_trans, mean, var, size=1000):
     return lx_noise, ly_noise
 
 
+class ot_classifier:
+    
+    def __init__(self, data, n_cluster, reg, reg1, reg2):
+        ### non-default parameters
+        self.data = data
+        self.n_cluster = n_cluster
+        self.reg = reg
+        self.reg1 = reg1
+        self.reg2 = reg2
+        self.n = data.shape[0]
+        self.dim = data.shape[1]
+        self.pn = np.repeat(1 / self.n, self.n)
+        ### default parameters
+        self.centroids = data[np.random.choice(np.arange(self.n), size=self.n_cluster, replace=True), :]
+        self.costm = solver.compute_dist(self.data, self.centroids, dim=self.dim, single=False)
+        self.pk = np.repeat(1 / self.n_cluster, n_cluster)
+        self.labels = np.zeros(self.n)
+        self.labels_record = []
+        self.obj = []
+
+    def compute_obj(self, tmap):
+        res = np.sum(self.costm * tmap + self.reg * tmap * np.log(tmap))
+        res += self.reg1 * solver.kl_div(tmap.sum(axis=1), self.pn)
+        res += self.reg2 * solver.kl_div(tmap.sum(axis=0), self.pk)
+        self.obj.append(res)
+
+    def compute_label(self):
+        tmap = solver.ot_unbalanced(self.pn, self.pk, self.costm, self.reg, self.reg1, self.reg2)
+        self.compute_obj(tmap)
+        labels = np.zeros(self.n)
+        for i in range(self.n):
+            labels[i] = np.argmax(tmap[i, ])
+        self.labels = labels
+        self.labels_record.append(labels)
+        counts = np.unique(self.labels, return_counts=True)[1]
+        self.pk = counts / counts.sum()
+            
+    def run_classifier(self, n_iter=5):
+        for i in range(n_iter):
+            self.compute_label()
+            for k in range(self.n_cluster):
+                self.centroids[k] = np.mean(self.data[self.labels == k, :], axis=0)
+            self.costm = solver.compute_dist(self.data, self.centroids, dim=self.dim, single=False)
+            
+    def plot(self):
+        n_iter = len(self.labels_record)
+        for i in range(n_iter):
+            plt.figure()
+            scatter = plt.scatter(self.data[:, 0], self.data[:, 1], c=self.labels_record[i])
+            plt.legend(*scatter.legend_elements(), title="Clusters")
+            plt.title('iteration ' + str(i + 1))
+
+        
+class sim_data:
+    
+    def __init__(self):
+        ### default parameters:
+            self.centroids = np.array([[1, 1],
+                                       [1, -1],
+                                       [-1, 1],
+                                       [-1, -1]])
+            self.n_cluster, self.dim = self.centroids.shape
+            self.cov = np.identity(self.dim) * 0.25
+            
+    def set_cov(self, cov):
+        self.cov = cov
+            
+    def generate_sample(self, size, weight):
+        self.p = weight
+        self.labels = np.random.choice(np.arange(self.n_cluster), size=size, p=weight)
+        data = np.zeros((size, self.dim))
+        for i in range(size):
+            data[i, ] = np.random.multivariate_normal(mean=self.centroids[self.labels[i], :],
+                                                      cov=self.cov)
+        self.data = data
+
+
+x = sim_data()
+x.generate_sample(size=1000, weight=[0.1, 0.2, 0.3, 0.4])
+ctool = ot_classifier(x.data, 4, 0.05, 1, 1)
+ctool.run_classifier(n_iter=50)
+# ctool.plot()
+plt.plot(ctool.obj)
+            
 # test data
 ##################################################
 # import seaborn as sns
