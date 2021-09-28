@@ -11,7 +11,7 @@ s = 20
 t = 22
 k = data.obs['louvain'].astype(int).max() + 1
 
-method = 'tsne'
+method = 'phate'
 
 index_s = data.obs['batch'].astype(int) == s
 index_t = data.obs['batch'].astype(int) == t
