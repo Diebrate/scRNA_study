@@ -1497,6 +1497,14 @@ def get_ot_unbalanced_cost_local_mc(data_mc, costm, reg, reg1, reg2, sink, win_s
         return np.array(res)
 
 
+def get_ot_unbalanced_cost_local_mc_tuning(data_mc, costm, reg, reg1, sink, win_size=None, weight=None):
+    M = len(data_mc)
+    res = []
+    for m in range(M):
+        res.append(solver.loss_unbalanced_all_local(data_mc[m], costm, reg, reg1[m], reg1[m], sink=sink, win_size=win_size, weight=weight))
+    return np.array(res)
+
+
 def get_ot_unbalanced_cost_mm_mc(data_mc, costm, reg, reg_phi, coeff, win_size, n_iter=10, exp_threshold=10):
     M = len(data_mc)
     res = []
@@ -1512,6 +1520,28 @@ def tmap_compare_mc(tmap_all, real_tmap):
         res[m] = np.sum(np.abs(tmap_all[m] - real_tmap))
     return res
 
+
+def ot_analysis_tuning(probs_all, costm, reg, file_path, sink, win_size, weight, grid_min, grid_max, grid_size=100):
+    dim_res = probs_all.shape
+    cost_all = np.empty(dim_res, dtype=object)
+    tmap_all = np.empty(dim_res, dtype=object)
+    reg1_all = np.empty(dim_res, dtype=object)
+    coords = list(np.ndindex(*dim_res))
+    M = probs_all[coords[0]].shape[0]
+    for coord in coords:
+        reg1 = []
+        for m in range(M):
+            reg1.append(solver.optimal_lambda_ts(probs_all[coord][m], costm, reg, grid_min, grid_max)['opt_lambda'])
+        cost_all[coord] = get_ot_unbalanced_cost_local_mc_tuning(probs_all[coord], costm, reg, reg1, sink=sink, win_size=win_size, weight=weight)
+        tmap_all[coord] = solver.ot_unbalanced_all_mc_tuning(probs_all[coord], costm, reg, reg1)
+        reg1_all[coord] = np.array(reg1)
+    np.save(file_path + '_reg1' + ('' if win_size is None else '_m' + str(win_size)) + ('' if weight is None else '_' + weight) + '.npy', reg1_all)
+    np.save(file_path + '_cost_tuning' + ('' if win_size is None else '_m' + str(win_size)) + ('' if weight is None else '_' + weight) + '.npy', cost_all)
+    np.save(file_path + '_tmap_tuning' + ('' if win_size is None else '_m' + str(win_size)) + ('' if weight is None else '_' + weight) + '.npy', tmap_all)
+    return {'cost': cost_all,
+            'tmap': tmap_all,
+            'reg1': reg1_all}
+        
 
 # def multisetting_cp_detection(nus, etas, ns, d, T, M, seed, costm, reg, reg1, reg2, balanced, sink, n_conv, *args, **method):
 #     np.random.seed(seed)

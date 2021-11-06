@@ -227,7 +227,7 @@ def ot_unbalanced_iter(a, b, costm, reg, reg1, reg2, n_iter=1000, n_conv=3):
     return tmap
 
 
-def ot_unbalanced_all_iter(a, b, costm, reg, reg1, reg2, n_iter=1000, n_conv=3):
+def ot_unbalanced_all_iter(a, b, costm, reg, reg1, reg2, n_iter=1000, n_conv=5):
     a_temp = a
     l = a.shape[0]
     for i in range(n_conv):
@@ -243,6 +243,14 @@ def ot_unbalanced_all_mc(prob_mc, costm, reg, reg1, reg2):
     tmap_mc = []
     for m in range(M):
         tmap_mc.append(ot_unbalanced_all(prob_mc[m, :T - 1, :].T, prob_mc[m, 1:, :].T, costm, reg, reg1, reg2))
+    return np.array(tmap_mc)
+
+
+def ot_unbalanced_all_mc_tuning(prob_mc, costm, reg, reg1):
+    M, T, d = prob_mc.shape
+    tmap_mc = []
+    for m in range(M):
+        tmap_mc.append(ot_unbalanced_all(prob_mc[m, :T - 1, :].T, prob_mc[m, 1:, :].T, costm, reg, reg1[m], reg1[m]))
     return np.array(tmap_mc)
 
 
@@ -691,19 +699,37 @@ def multimarg_unbalanced_ot_all(probs, costm, reg, reg_phi, win_size, coeff=None
     return res
 
  
-def optimal_lambda(a, b, costm, reg, reg2, reg1_min, reg1_max, step=20):
-    def obj_func(t, m):
-        return np.sum(t * m)
-    reg1_arr = np.linspace(reg1_min, reg1_max, step)
+def optimal_lambda(a, b, costm, reg, grid_min, grid_max, step=50):
+    def obj_func(t, m, r):
+        return np.sum(t * m) + r * np.sum(t * np.log(t))
+    reg1_arr = np.linspace(grid_min, grid_max, step)
     obj_val = []
     growth = []
     for reg1 in reg1_arr:
-        tmap = ot_unbalanced_iter(a, b, costm, reg, reg1, reg2)
-        obj_val.append(obj_func(tmap, costm))
-        growth.append(estimate_growth1(a, b, costm, reg, reg1, reg2, conv=True))
+        tmap = ot_unbalanced(a, b, costm, reg, reg1, reg1)
+        obj_val.append(obj_func(tmap, costm, reg))
+        # growth.append(estimate_growth1(a, b, costm, reg, reg1, reg1, conv=True))
     opt_ind = np.argmin(np.array(obj_val))
     return {'obj_func': np.array(obj_val),
-            'growth_est': np.array(growth),
+            # 'growth_est': np.array(growth),
+            'opt_lambda': reg1_arr[opt_ind],
+            'opt_index': opt_ind}
+
+
+def optimal_lambda_ts(probs, costm, reg, grid_min, grid_max, grid_size=50):
+    def obj_func(t, p):
+        return kl_div(np.sum(t, axis=1), p) + kl_div(np.sum(t, axis=0), p)
+    T = probs.shape[0]
+    reg1_arr = np.linspace(grid_min, grid_max, grid_size + 1)[1:]
+    obj_val = []
+    for reg1 in reg1_arr:
+        tmap = ot_unbalanced_all(probs[:T - 2, :].T, probs[2:, :].T, costm, reg, reg1, reg1)
+        obj_temp = 0
+        for t in range(T - 2):
+            obj_temp += obj_func(tmap[t], probs[t + 1, :])
+        obj_val.append(obj_temp)
+    opt_ind = np.argmin(np.array(obj_val))
+    return {'obj_func': np.array(obj_val),
             'opt_lambda': reg1_arr[opt_ind],
             'opt_index': opt_ind}
 
@@ -769,27 +795,22 @@ def interpolate_weight(a, b, costm, reg, reg1, reg2, h, p0=None, n_conv=1000):
 #     b[:,i] = b_temp / np.sum(b_temp)
 #     x[:,i] = x_temp / np.sum(x_temp)
 #     y[:,i] = y_temp / np.sum(y_temp)
-# costm = np.random.rand(5, 5) * 10
+# costm = np.random.rand(5, 5)
 # costm = costm @ costm.transpose()
 # np.fill_diagonal(costm, 0)
-# reg = 1
+# reg = 0.05
 # reg1 = 1
-# reg2 = 50
-# res_bal = sink_loss_balanced_all(a, b, costm, reg)
-# res_unbal = sink_loss_unbalanced_all(a, b, costm, reg, reg1, reg2)
-# est = interpolate_weight(pa, pb, costm, reg, reg1, reg2, 0.5, p0=pb)
-# res = optimal_lambda(pa, pb, costm, reg, reg2, 1, 50, step=100)
+# # reg2 = 1
+# # res_bal = sink_loss_balanced_all(a, b, costm, reg)
+# # res_unbal = sink_loss_unbalanced_all(a, b, costm, reg, reg1, reg2)
+# # est = interpolate_weight(pa, pb, costm, reg, reg1, reg2, 0.5, p0=pb)
+# res = optimal_lambda(pa, pb, costm, reg, 1, 50, step=100)
 # import matplotlib.pyplot as plt
 # plt.plot(np.linspace(1, 50, 100), res['obj_func'])
 # plt.xlabel('lambda1')
 # plt.ylabel('objection function')
 ##################################################
 
-
-# test data 2
-##################################################
-
-##################################################    
 
 
 
