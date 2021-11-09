@@ -1731,12 +1731,12 @@ class sim_data:
         self.data = data
 
 
-x = sim_data()
-x.generate_sample(size=1000, weight=[0.1, 0.2, 0.3, 0.4])
-ctool = ot_classifier(x.data, 4, 0.05, 1, 1)
-ctool.run_classifier(n_iter=50)
-# ctool.plot()
-plt.plot(ctool.obj)
+# x = sim_data()
+# x.generate_sample(size=1000, weight=[0.1, 0.2, 0.3, 0.4])
+# ctool = ot_classifier(x.data, 4, 0.05, 1, 1)
+# ctool.run_classifier(n_iter=50)
+# # ctool.plot()
+# plt.plot(ctool.obj)
             
 # test data
 ##################################################
