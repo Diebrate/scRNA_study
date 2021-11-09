@@ -96,7 +96,7 @@ ax.set_ylabel('Loss', size=20)
 ax.set_title(r'Time vs Loss with WOT embedding', size = 20)
 plt.legend()
 
-graph_tmap = False
+graph_tmap = True
 
 if graph_tmap:
     for i in range(T - 1):
@@ -105,7 +105,7 @@ if graph_tmap:
         plt.title('Transport map from ' + time_names[i] + ' to ' + time_names[i+1])
         cbar = plt.colorbar()
         cbar.set_label('probability')
-        ax.set_xticklabels(np.insert(type_list, 0, ''), rotation=45)
+        ax.set_xticklabels(np.insert(type_list, 0, ''), rotation=20)
         ax.set_yticklabels(np.insert(type_list, 0, ''))
         reform_time_name = time_names[i].replace('.', '_') + 'to' + time_names[i+1].replace('.', '_')
         plt.savefig(r'..\image\wot_tmap\transport_map_'+reform_time_name)
