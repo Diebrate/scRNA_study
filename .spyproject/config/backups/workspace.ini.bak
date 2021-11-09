@@ -6,5 +6,5 @@ save_non_project_files = False
 
 [main]
 version = 0.2.0
-recent_files = ['solver.py', 'test\\test_util.py', 'test\\main_test.py', 'test\\ot_real_data.py', 'wot\\cell_type.py', 'test\\wot_real_data.py', 'preproc\\preproc.py']
+recent_files = ['solver.py', 'test\\test_util.py', 'test\\main_test.py', 'test\\ot_real_data.py', 'wot\\cell_type.py', 'test\\wot_real_data.py']
 
