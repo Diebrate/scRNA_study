@@ -59,6 +59,8 @@ if get_df:
     full_df.to_csv(r'data\full_df.csv')
 
 full_df = pd.read_csv(r'data\full_df.csv')
+full_df = full_df[full_df['day'] != 8.25]
+full_df = full_df[full_df['day'] != 8.75]
 
 get_ot = False
 if get_ot:
@@ -80,10 +82,12 @@ if get_ot:
     ot_df['cell type'].fillna('MEF', inplace=True)
     
 ot_df = pd.read_csv(r'..\data\proc_data\ot_df.csv')
+ot_df = ot_df[ot_df['day'] != 8.25]
+ot_df = ot_df[ot_df['day'] != 8.75]
 
 fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True, figsize=(15, 8))
 
-plot_wot = False
+plot_wot = True
 
 if plot_wot:
     scatter = ax[0].scatter(x=full_df['x'], y=full_df['y'], s=0.25, c=full_df['day'])
