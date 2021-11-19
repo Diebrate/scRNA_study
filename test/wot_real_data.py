@@ -36,8 +36,8 @@ time_names = time_names['time'].to_numpy()
 time_names = time_names[time_names != 'D8.25']
 time_names = time_names[time_names != 'D8.75']
 
-# df = pd.read_csv(r'..\wot\data\full_df.csv')
-df = pd.read_csv(r'..\data\proc_data\ot_df.csv')
+df = pd.read_csv(r'..\wot\data\full_df.csv')
+# df = pd.read_csv(r'..\data\proc_data\ot_df.csv')
 df = df[df['day'] != 8.25]
 df = df[df['day'] != 8.75]
 time_labels = [float(i[1:]) for i in time_names]
@@ -57,10 +57,10 @@ for t in range(T):
     probs.append(p_temp)
 probs = np.array(probs)
 costm = test_util.get_cost_matrix(centroids, centroids, dim=dim)
-# costm = costm / costm.mean()
-reg_opt = solver.optimal_lambda_ts(probs, costm, reg, 0, 10)['opt_lambda']
-reg1 = reg2 = reg_opt
-tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=reg, reg1=reg1, reg2=reg2)
+costm = costm / 100000
+# reg_opt = solver.optimal_lambda_ts(probs, costm, reg, 0, 10)['opt_lambda']
+# reg1 = reg2 = reg_opt
+tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=reg, reg1=0.5, reg2=50)
 cost = solver.loss_unbalanced_all_local(probs, costm, reg, reg1, reg2, sink=sink, win_size=win_size, weight=weight, partial=True)
 
 ### normalization
