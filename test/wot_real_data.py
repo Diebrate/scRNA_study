@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Nov  8 02:33:09 2021
-
-@author: User
-"""
-
 import numpy as np
 import pandas as pd
 import anndata
@@ -41,6 +34,9 @@ df = pd.read_csv(r'..\wot\data\full_df.csv')
 df = df[df['day'] != 8.25]
 df = df[df['day'] != 8.75]
 time_labels = [float(i[1:]) for i in time_names]
+sample_size = pd.DataFrame()
+sample_size['day'] = time_labels
+sample_size['sample size'] = df.groupby('day').size().to_numpy()
 
 T = len(time_labels)
 k = len(np.unique(df['cell type']))
@@ -98,7 +94,7 @@ ax.set_xticks(x)
 ax.set_xticklabels(time_names[:-1], rotation=70, size=10)
 ax.set_xlabel('Time', size=20)
 ax.set_ylabel('Loss', size=20)
-ax.set_title(r'Time vs Loss with WOT embedding', size = 20)
+ax.set_title(r'Time vs Loss with PHATE Embedding', size = 20)
 plt.legend()
 
 graph_tmap = True
