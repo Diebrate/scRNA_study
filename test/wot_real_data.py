@@ -19,7 +19,7 @@ weight = None
 do_cost = True
 do_load = True
 
-reg = 0.05
+reg = 0.01
 reg1 = 1
 reg2 = 1
 
@@ -29,8 +29,8 @@ time_names = time_names['time'].to_numpy()
 time_names = time_names[time_names != 'D8.25']
 time_names = time_names[time_names != 'D8.75']
 
-df = pd.read_csv(r'..\wot\data\full_df.csv')
-# df = pd.read_csv(r'..\data\proc_data\ot_df.csv')
+# df = pd.read_csv(r'..\wot\data\full_df.csv')
+df = pd.read_csv(r'..\data\proc_data\ot_df.csv')
 df = df[df['day'] != 8.25]
 df = df[df['day'] != 8.75]
 time_labels = [float(i[1:]) for i in time_names]
@@ -53,17 +53,18 @@ for t in range(T):
     probs.append(p_temp)
 probs = np.array(probs)
 costm = test_util.get_cost_matrix(centroids, centroids, dim=dim)
-costm = costm / 100000
-# reg_opt = solver.optimal_lambda_ts(probs, costm, reg, 0, 10)['opt_lambda']
+# costm = costm / 100000
+# costm = costm / np.sum(costm)
+reg_opt = solver.optimal_lambda_ts(probs, costm, reg, 0, 10)['opt_lambda']
 # reg1 = reg2 = reg_opt
-tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=reg, reg1=0.5, reg2=50)
+tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=reg, reg1=reg_opt, reg2=50)
 cost = solver.loss_unbalanced_all_local(probs, costm, reg, reg1, reg2, sink=sink, win_size=win_size, weight=weight, partial=True)
 
 ### normalization
-cost = cost / np.sum(cost)
-cost = np.append(cost, np.nan)
+# cost = cost / np.sum(cost)
+# cost = np.append(cost, np.nan)
 
-cp = test_util.get_cp_from_cost(cost, win_size=win_size)
+# cp = test_util.get_cp_from_cost(cost, win_size=win_size)
 
 if do_cost:
     local_cost_disc = solver.compute_cost_disc(probs, costm, reg, reg1, reg2, sink=sink, partial=True, max_win_size=4)
@@ -73,10 +74,14 @@ if do_load:
     local_cost_disc = np.load(r'..\results\cost_local_disc_wot.npy')
     
 cost_disc_m = [solver.get_weighted_cost(local_cost_disc, weight=weight, win_size=i) for i in [1, 2, 3, 4]]
+cp = []
+cp_days = []
 
 ### normalizing the cost
 for i in range(4):
     cost_disc_m[i] = cost_disc_m[i] / np.sum(cost_disc_m[i])
+    cp.append(test_util.get_cp_from_cost(cost_disc_m[i], win_size=i + 1))
+    cp_days.append(time_names[cp[i]])
 
 x = list(range(T - 1))
 # z = np.polyfit(x, [float(i) for i in cost], 7)
@@ -96,6 +101,7 @@ ax.set_xlabel('Time', size=20)
 ax.set_ylabel('Loss', size=20)
 ax.set_title(r'Time vs Loss with PHATE Embedding', size = 20)
 plt.legend()
+plt.savefig(r'..\image\wot_res')
 
 graph_tmap = True
 

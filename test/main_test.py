@@ -73,7 +73,7 @@ potential model performance evaluation.
 
 do_check = False
 do_cost = False
-do_param_select = True
+do_param_select = False
 n_sim = 100
 ns_size = [100, 1000, 10000]
 n_grid = 100
