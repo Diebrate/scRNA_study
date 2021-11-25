@@ -39,20 +39,27 @@ for path in path_names:
 # data = data_raw[0].copy()
 # data.var_names_make_unique()
 data = anndata.AnnData.concatenate(*data_raw)
+  
+do_preproc = True
+if do_preproc:
+    scanpy.pp.downsample_counts(data, counts_per_cell=15000)
+    scanpy.pp.filter_cells(data, min_counts=2000)
+    scanpy.pp.filter_genes(data, min_cells=50)
+    scanpy.pp.normalize_total(data, target_sum=10000, inplace=True)
+    scanpy.pp.log1p(data)
+    # scanpy.pp.recipe_seurat(data, log=False)
+    # scanpy.pp.combat(data)
+    # scanpy.tl.pca(data, n_comps=5)
+    # scanpy.pp.neighbors(data)
+    # scanpy.external.pp.bbknn(data, batch_key='batch')
+    # scanpy.tl.tsne(data)
+    # scanpy.tl.umap(data)
+    # scanpy.tl.louvain(data)
     
-scanpy.pp.recipe_seurat(data)
-# scanpy.pp.combat(data)
-# scanpy.tl.pca(data, n_comps=5)
-# scanpy.pp.neighbors(data)
-# scanpy.external.pp.bbknn(data, batch_key='batch')
-# scanpy.tl.tsne(data)
-# scanpy.tl.umap(data)
-# scanpy.tl.louvain(data)
-
-phate_op = phate.PHATE(n_jobs=-2, n_pca=20)
-Y_phate = phate_op.fit_transform(data.X)
-
-data.obsm['X_phate'] = Y_phate
-# data.obs['time'] = np.array([time_names[int(i)] for i in data.obs['batch']], dtype=str)
+    phate_op = phate.PHATE(n_jobs=-2, n_pca=20)
+    Y_phate = phate_op.fit_transform(data.X)
+    
+    data.obsm['X_phate'] = Y_phate
+    # data.obs['time'] = np.array([time_names[int(i)] for i in data.obs['batch']], dtype=str)
     
 print("--- %s seconds ---" % (time.time() - start_time))

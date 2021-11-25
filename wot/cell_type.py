@@ -63,8 +63,12 @@ full_df = full_df[full_df['day'] != 8.25]
 full_df = full_df[full_df['day'] != 8.75]
 
 get_ot = False
+seurat = False
 if get_ot:
-    ot_df = wot.io.read_dataset(r'..\data\proc_data\proc_df_full.h5ad')
+    if seurat:
+        ot_df = wot.io.read_dataset(r'..\data\proc_data\proc_df_full.h5ad')
+    else:
+        ot_df = wot.io.read_dataset(r'..\data\proc_data\proc_df_full_no_seurat.h5ad')
     
     cell_id = ot_df.obs_names.to_numpy()
     cell_id_list = np.array([re.search(r'^.*-1(?=-)', name).group() for name in cell_id])
@@ -81,13 +85,15 @@ if get_ot:
     ot_df = ot_df.join(full_id_new)
     ot_df['cell type'].fillna('MEF', inplace=True)
     
+    ot_df.to_csv(r'..\data\proc_data\ot_df.csv')
+    
 ot_df = pd.read_csv(r'..\data\proc_data\ot_df.csv')
 ot_df = ot_df[ot_df['day'] != 8.25]
 ot_df = ot_df[ot_df['day'] != 8.75]
 
 fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True, figsize=(15, 8))
 
-plot_wot = True
+plot_wot = False
 
 if plot_wot:
     scatter = ax[0].scatter(x=full_df['x'], y=full_df['y'], s=0.25, c=full_df['day'])
