@@ -89,6 +89,36 @@ def ot_balanced(a, b, costm, reg, n_iter=1000):
         tmap = np.diag(a) @ np.diag(1 / tmap.sum(axis=1)) @ tmap
         tmap = tmap @ np.diag(1 / tmap.sum(axis=0)) @ np.diag(b)
     return tmap
+
+
+def ot_balanced_log_stabilized(a, b, costm, reg, reg_list, n_iter=1000, tau=50, n_per_reg=20):
+    def diag_iter(costm, a, b, u, v, reg, n_iter, get_scaling=False):
+        K0 = np.exp((np.add.outer(u, v) - costm) / reg)
+        b0 = np.ones(b.shape[0])
+        u0 = u
+        v0 = v
+        for i in range(n_iter):
+            a0 = a / (K0 @ b0)
+            b0 = b / (K0.T @ a0)
+            if np.max(np.abs(np.log(np.hstack((a0, b0))))) > tau:
+                # print('detected')
+                u0 = u0 + reg * np.log(a0)
+                v0 = v0 + reg * np.log(b0)
+                K0 = np.exp((np.add.outer(u0, v0) - costm) / reg)
+                b0 = np.ones(b.shape[0])
+        if get_scaling:
+            return u0, v0, a0, b0, K0
+        else:
+            return u0, v0
+    def update_uv(a, b, costm, reg, u, v):
+        return diag_iter(costm, a, b, u, v, reg, n_iter=n_per_reg)
+    u = np.zeros(a.shape[0])
+    v = np.zeros(b.shape[0])
+    for r in reg_list:
+        # print('r=' + str(r))
+        u, v = update_uv(a, b, costm, r, u, v)
+    u, v, a0, b0, K = diag_iter(costm, a, b, u, v, reg, n_iter=n_iter, get_scaling=True)
+    return np.diag(a0) @ K @ np.diag(b0)
     
 
 def ot_unbalanced(a, b, costm, reg, reg1, reg2, n_iter=1000):
@@ -101,6 +131,43 @@ def ot_unbalanced(a, b, costm, reg, reg1, reg2, n_iter=1000):
     return tmap / np.sum(tmap)
 
 
+def ot_unbalanced_log_stabilized(a, b, costm, reg, reg1, reg2, reg_list, n_iter=1000, tau=50, n_per_reg=20):
+    def prox_0(a, b, K, reg, reg_m):
+        return a / (K @ b)
+    def prox_pos(a, b, K, reg, reg_m):
+        return (a / (K @ b)) ** (reg_m / (reg + reg_m))
+    def diag_iter(costm, a, b, u, v, reg, reg1, reg2, n_iter, get_scaling=False):
+        prox_a = prox_0 if reg1 == 0 else prox_pos
+        prox_b = prox_0 if reg2 == 0 else prox_pos
+        K0 = np.exp((np.add.outer(u, v) - costm) / reg)
+        b0 = np.ones(b.shape[0])
+        u0 = u
+        v0 = v
+        for i in range(n_iter):
+            a0 = prox_a(a, b0, K0, reg, reg1)
+            b0 = prox_b(b, a0, K0.T, reg, reg2)
+            if np.max(np.abs(np.log(np.hstack((a0, b0))))) > tau:
+                # print('detected')
+                u0 = u0 + reg * np.log(a0)
+                v0 = v0 + reg * np.log(b0)
+                K0 = np.exp((np.add.outer(u0, v0) - costm) / reg)
+                b0 = np.ones(b.shape[0])
+        if get_scaling:
+            return u0, v0, a0, b0, K0
+        else:
+            return u0, v0
+    def update_uv(a, b, costm, reg, reg1, reg2, u, v):
+        return diag_iter(costm, a, b, u, v, reg, reg1, reg2, n_iter=n_per_reg)
+    u = np.zeros(a.shape[0])
+    v = np.zeros(b.shape[0])
+    for r in reg_list:
+        # print('r=' + str(r))
+        u, v = update_uv(a, b, costm, r, reg1, reg2, u, v)
+    u, v, a0, b0, K = diag_iter(costm, a, b, u, v, reg, reg1, reg2, n_iter=n_iter, get_scaling=True)
+    tmap = np.diag(a0) @ K @ np.diag(b0)
+    return tmap / np.sum(tmap)
+
+
 def ot_unbalanced_uv(a, b, costm, reg, reg1, reg2, n_iter=1000):
     K = np.exp(-costm / reg)
     v = np.repeat(1, len(b))
@@ -109,6 +176,37 @@ def ot_unbalanced_uv(a, b, costm, reg, reg1, reg2, n_iter=1000):
         v = (b / (np.transpose(K) @ u)) ** (reg2 / (reg + reg2))
     tmap = np.diag(u) @ K @ np.diag(v)
     return u / np.sqrt(np.sum(tmap)), v / np.sqrt(np.sum(tmap)), tmap / np.sum(tmap) 
+
+
+def ot_pairwise(x, y, costm=None, bal=True, **kwargs):
+    n1 = x.shape[0]
+    n2 = y.shape[0]
+    if costm is None:
+        data = np.vstack((x, y))
+        costm = compute_dist(data, dim=x.shape[1], single=True)
+        p1 = np.block([[np.ones(n1) / n1, np.zeros(n2)],
+                       [np.ones(n1) / n1, np.zeros(n2)],
+                       [np.zeros(n1), np.ones(n2) / n2],
+                       [np.zeros(n1), np.ones(n2) / n2]]).T
+        p2 = np.block([[np.ones(n1) / n1, np.zeros(n2)],
+                       [np.zeros(n1), np.ones(n2) / n2],
+                       [np.ones(n1)/ n1, np.zeros(n2)],
+                       [np.zeros(n1), np.ones(n2) / n2]]).T
+    else: 
+        p1 = np.block([[x, np.zeros(n2)],
+                       [x, np.zeros(n2)],
+                       [np.zeros(n1), y],
+                       [np.zeros(n1), y]]).T
+        p2 = np.block([[x, np.zeros(n2)],
+                       [np.zeros(n1), y],
+                       [x, np.zeros(n2)],
+                       [np.zeros(n1), y]]).T
+    ot_compute = ot_balanced_all if bal else ot_unbalanced_all
+    tmap = ot_compute(p1, p2, costm, **kwargs)
+    tmap_aa = tmap[0][:n1, :n1]
+    tmap_bb = tmap[3][n1:, n1:]
+    tmap_ab = tmap[1][:n1, n1:]
+    return tmap_aa / tmap_aa.sum(), tmap_bb / tmap_bb.sum(), tmap_ab / tmap_ab.sum()
 
 
 def ot_unbalanced_uv_all(a, b, costm, reg, reg1, reg2, n_iter=1000):
@@ -252,6 +350,49 @@ def ot_unbalanced_all_mc_tuning(prob_mc, costm, reg, reg1):
     for m in range(M):
         tmap_mc.append(ot_unbalanced_all(prob_mc[m, :T - 1, :].T, prob_mc[m, 1:, :].T, costm, reg, reg1[m], reg1[m]))
     return np.array(tmap_mc)
+
+
+def hierarchical_ot(x1, x2, y1, y2, reg, reg1, reg2, bal_out=True, bal_in=False, mini_batch=False, batch_frac=None, batch_num=None):
+    labels1, counts1 = np.unique(y1, return_counts=True)
+    labels2, counts2 = np.unique(y2, return_counts=True)
+    d1 = len(labels1)
+    d2 = len(labels2)
+    costm_out = np.zeros((d1, d2))
+    dim = x1.shape[1]
+    for i in range(d1):
+        for j in range(d2):
+            x1_temp = x1[y1 == labels1[i]]
+            x2_temp = x2[y2 == labels2[j]]
+            n1 = x1_temp.shape[0]
+            n2 = x2_temp.shape[0]
+            if mini_batch:
+                cost_temp = 0
+                m1 = int(n1 * batch_frac)
+                m2 = int(n2 * batch_frac)
+                batch1 = []
+                batch2 = []
+                for k in range(batch_num):
+                    batch1.append(np.random.permutation(np.arange(n1))[:m1 + 1])
+                    batch2.append(np.random.permutation(np.arange(n2))[:m2 + 1])
+                for k1 in range(batch_num):
+                    for k2 in range(batch_num):
+                        if bal_in:
+                            cost_temp += loss_balanced_cont(x1_temp[batch1[k1]], x2_temp[batch2[k2]], reg, dim=2)
+                        else:
+                            cost_temp += loss_balanced_cont(x1_temp[batch1[k1]], x2_temp[batch2[k2]], reg, reg1, reg2, dim=2)
+                costm_out[i, j] = cost_temp / (batch_num ** 2)
+            else:
+                if bal_in:
+                    costm_out[i, j] = loss_balanced_cont(x1_temp, x2_temp, reg, dim=2)
+                else:
+                    costm_out[i, j] = loss_unbalanced_cont(x1_temp, x2_temp, reg, reg1, reg2, dim=2)
+    if bal_out:
+        tmap = ot_balanced(counts1 / x1.shape[0], counts2 / x2.shape[0], costm_out, reg)
+        loss = wass_loss_balanced(counts1 / x1.shape[0], counts2 / x2.shape[0], costm_out, reg)
+    else:
+        tmap = ot_unbalanced(counts1 / x1.shape[0], counts2 / x2.shape[0], costm_out, reg, reg1, reg2)
+        loss = wass_loss_unbalanced(counts1 / x1.shape[0], counts2 / x2.shape[0], costm_out, reg, reg1, reg1)
+    return tmap, loss, costm_out
 
 
 def norm_tmap(tmap):
@@ -442,6 +583,28 @@ def loss_unbalanced_partial(a, b, costm, reg, reg1, reg2, sink=True):
         return loss(tmap_ab, a_sub, b_sub, get_sub(costm, ind_a, ind_b), reg, reg1, reg2) + loss(tmap_ba, b_sub, a_sub, get_sub(costm, ind_b, ind_a), reg, reg2, reg1)
 
 
+def loss_balanced_cont(x0, x1, reg, dim, sink=True):
+    def loss(t, pa, pb, m, r):
+        c = np.sum(t * (m + r * np.log(t)))
+        return c
+    a = np.repeat(1 / len(x0), len(x0))
+    b = np.repeat(1 / len(x1), len(x1))
+    if sink:
+        costm_ab = compute_dist(x0, x1, dim=dim, single=False)
+        costm_aa = compute_dist(x0, dim=dim)
+        costm_bb = compute_dist(x1, dim=dim)
+        tmap_ab = ot_balanced(a, b, costm_ab, reg)
+        tmap_aa = ot_balanced(a, a, costm_aa, reg)
+        tmap_bb = ot_balanced(b, b, costm_bb, reg)
+        c = loss(tmap_ab, a, b, costm_ab, reg)
+        c -= 0.5 * loss(tmap_aa, a, a, costm_aa, reg)
+        c -= 0.5 * loss(tmap_bb, b, b, costm_bb, reg)
+        return c
+    else:
+        tmap_ab = comp(a, b, costm_ab, reg, reg1, reg2)
+        return loss(tmap_ab, a, b, costm_ab, reg, reg1, reg2)
+
+
 def loss_unbalanced_cont(x0, x1, reg, reg1, reg2, dim, sink=True):
     def loss(t, pa, pb, m, r, r1, r2):
         c = np.sum(t * (m + r * np.log(t)))
@@ -451,21 +614,18 @@ def loss_unbalanced_cont(x0, x1, reg, reg1, reg2, dim, sink=True):
     b = np.repeat(1 / len(x1), len(x1))
     if sink:
         costm_ab = compute_dist(x0, x1, dim=dim, single=False)
-        costm_ba = costm_ab.T
         costm_aa = compute_dist(x0, dim=dim)
         costm_bb = compute_dist(x1, dim=dim)
         tmap_ab = ot_unbalanced(a, b, costm_ab, reg, reg1, reg2)
-        tmap_ba = ot_unbalanced(b, a, costm_ba, reg, reg2, reg2)
         tmap_aa = ot_unbalanced(a, a, costm_aa, reg, reg1, reg1)
         tmap_bb = ot_unbalanced(b, b, costm_bb, reg, reg2, reg2)
-        c = loss(tmap_ab, a, b, costm_ab, reg, reg1, reg2) + loss(tmap_ba, b, a, costm_ba, reg, reg2, reg1)
-        c -= 1 * loss(tmap_aa, a, a, costm_aa, reg, reg1, reg2)
-        c -= 1 * loss(tmap_bb, b, b, costm_bb, reg, reg1, reg2)
+        c = loss(tmap_ab, a, b, costm_ab, reg, reg1, reg2)
+        c -= 0.5 * loss(tmap_aa, a, a, costm_aa, reg, reg1, reg2)
+        c -= 0.5 * loss(tmap_bb, b, b, costm_bb, reg, reg1, reg2)
         return c
     else:
         tmap_ab = comp(a, b, costm_ab, reg, reg1, reg2)
-        tmap_ba = comp(b, a, costm_ba, reg, reg2, reg2)
-        return loss(tmap_ab, a, b, costm_ab, reg, reg1, reg2) + loss(tmap_ba, b, a, costm_ba, reg, reg2, reg1)
+        return loss(tmap_ab, a, b, costm_ab, reg, reg1, reg2)
     
 
 def loss_unbalanced_all_local(probs, costm, reg, reg1, reg2, sink=True, win_size=1, weight=None, partial=False):
@@ -777,6 +937,50 @@ def interpolate_weight(a, b, costm, reg, reg1, reg2, h, p0=None, n_conv=1000):
     return {'p': p / np.sum(p),
             'obj': obj}
 
+
+def compute_payoff(x, y, h):
+    dim = x.shape[1]
+    nx = x.shape[0]
+    ny = y.shape[0]
+    cost_xx = compute_dist(x, x, dim=dim, single=False)
+    cost_yy = compute_dist(y, y, dim=dim, single=False)
+    cost_xy = compute_dist(x, y, dim=dim, single=False)
+    kernel_x = np.exp(-(cost_xx ** 2) / h).sum(axis=0) / nx
+    kernel_y = np.exp(-(cost_yy ** 2) / h).sum(axis=0) / ny
+    return -np.divide.outer(kernel_y, kernel_x) * cost_xy
+
+
+def compute_otgt_map_balanced(x, y, reg, eta, payoff, n_iter=1000):
+    gt_map = np.exp(payoff / eta)
+    gt_map = np.diag(1 / (gt_map.sum(axis=1) * y.shape[0])) @ gt_map
+    costm = compute_dist(x, y, dim=x.shape[1], single=False)
+    # tmap = ot_balanced(np.ones(x.shape[0]) / x.shape[0],
+    #                    np.ones(y.shape[0]) / y.shape[0],
+    #                    costm - reg * np.log(gt_map),
+    #                    reg, n_iter=n_iter)
+    reg_list = (100 - reg) * np.exp(-np.arange(30)) + reg
+    tmap = ot_balanced_log_stabilized(np.ones(x.shape[0]) / x.shape[0], 
+                                      np.ones(y.shape[0]) / y.shape[0], 
+                                      costm - reg * np.log(gt_map), 
+                                      reg, reg_list, n_iter=n_iter)
+    return tmap
+
+
+def compute_otgt_map_unbalanced(x, y, reg, reg1, reg2, eta, payoff, n_iter=1000):
+    gt_map = np.exp(payoff / eta)
+    gt_map = np.diag(1 / (gt_map.sum(axis=1) * y.shape[0])) @ gt_map
+    costm = compute_dist(x, y, dim=x.shape[1], single=False)
+    # tmap = ot_balanced(np.ones(x.shape[0]) / x.shape[0],
+    #                    np.ones(y.shape[0]) / y.shape[0],
+    #                    costm - reg * np.log(gt_map),
+    #                    reg, n_iter=n_iter)
+    reg_list = (100 - reg) * np.exp(-np.arange(30)) + reg
+    tmap = ot_unbalanced_log_stabilized(np.ones(x.shape[0]) / x.shape[0], 
+                                        np.ones(y.shape[0]) / y.shape[0], 
+                                        costm - reg * np.log(gt_map), 
+                                        reg, reg1, reg2, reg_list, n_iter=n_iter)
+    return tmap
+
       
 # test data 1
 ##################################################
@@ -812,6 +1016,39 @@ def interpolate_weight(a, b, costm, reg, reg1, reg2, h, p0=None, n_conv=1000):
 ##################################################
 
 
+# test data 2
+##################################################
+# import ot
+# np.random.seed(12345)
+# a = np.repeat(1 / 3, 3)
+# b = np.repeat(1 / 4, 4)
+# costm = np.random.rand(3, 4)
+# reg = 0.00001
+# reg_list = (100 - reg) * np.exp(-np.arange(100)) + reg
+# tmap1 = ot_balanced(a, b, costm, reg)
+# tmap2 = ot_balanced_log_stabilized(a, b, costm, reg, reg_list=reg_list)
+# tmap3 = ot.bregman.sinkhorn_epsilon_scaling(a, b, costm, reg)
+# print(tmap2)
+##################################################
+
+
+# test data 3
+##################################################
+# import ot
+# np.random.seed(12345)
+# a = np.repeat(1 / 3, 3)
+# b = np.repeat(1 / 4, 4)
+# costm = np.random.rand(3, 4)
+# reg = 5
+# reg1 = 1
+# reg2 = 1
+# reg_list = (100 - reg) * np.exp(-np.arange(100)) + reg
+# tmap1 = ot_unbalanced(a, b, costm, reg, reg1, reg2)
+# tmap2 = ot_unbalanced_log_stabilized(a, b, costm, reg, reg1, reg2, reg_list=reg_list)
+# tmap3 = ot.unbalanced.sinkhorn_stabilized_unbalanced(a, b, costm, reg, reg1)
+# tmap3 = tmap3 / np.sum(tmap3)
+# print(tmap2)
+####################
 
 
 

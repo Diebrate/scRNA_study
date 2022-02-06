@@ -12,6 +12,8 @@ import seaborn as sns
 
 import peak_detection
 
+import time
+
 def decimal_trunc(x, n_dec):
     x_temp = x * (10 ** n_dec)
     x_temp = np.trunc(x_temp)
@@ -1541,7 +1543,52 @@ def ot_analysis_tuning(probs_all, costm, reg, file_path, sink, win_size, weight,
     return {'cost': cost_all,
             'tmap': tmap_all,
             'reg1': reg1_all}
-        
+
+
+def compute_payoff_all_t(data_all, h):
+    payoff = []
+    T = len(data_all)
+    for t in range(T - 1):
+        payoff.append(solver.compute_payoff(data_all[t], data_all[t + 1], h))
+    return payoff
+
+
+def compute_otgt_balanced_all_t(data_all, payoff_all, reg, eta, n_iter=1000):
+    tmap = []
+    T = len(data_all)
+    for t in range(T - 1):
+        tmap.append(solver.compute_otgt_map_balanced(x=data_all[t], y=data_all[t + 1], payoff=payoff_all[t], reg=reg, eta=eta, n_iter=n_iter))
+    return tmap
+
+
+def compute_otgt_unbalanced_all_t(data_all, payoff_all, reg, reg1, reg2, eta, n_iter=1000):
+    tmap = []
+    T = len(data_all)
+    for t in range(T - 1):
+        tmap.append(solver.compute_otgt_map_unbalanced(x=data_all[t], y=data_all[t + 1], payoff=payoff_all[t], reg=reg, reg1=reg1, reg2=reg2, eta=eta, n_iter=n_iter))
+    return tmap
+
+
+def sample_path(x, y_all, tmap_all, n_sim, plot=False):
+    T = len(tmap_all)
+    ind0 = np.random.choice(np.arange(x.shape[0]))
+    sample = []
+    for n in range(n_sim):
+        sample_temp = np.zeros((T + 1, 2))
+        sample_temp[0] = x[ind0]
+        ind = ind0
+        for t in range(T):
+            p = tmap_all[t][ind, :]
+            p = p / p.sum()
+            ind = np.random.choice(np.arange(y_all[t].shape[0]))
+            sample_temp[t + 1] = y_all[t][ind]
+        sample.append(sample_temp)
+    if plot:
+        plt.figure(figsize=(10, 8))
+        for n in range(n_sim):
+            plt.plot(sample[n][:, 0], sample[n][:, 1])
+    return sample
+
 
 # def multisetting_cp_detection(nus, etas, ns, d, T, M, seed, costm, reg, reg1, reg2, balanced, sink, n_conv, *args, **method):
 #     np.random.seed(seed)
@@ -1566,7 +1613,7 @@ def ot_analysis_tuning(probs_all, costm, reg, file_path, sink, win_size, weight,
 #             res_n0['nu=' + str(nu)] = pd.concat(res_nu0, axis='columns', keys=['eta=' + str(e) for e in etas])
 #         res_total['n=' + str(n)] = pd.concat(res_n0)
 #     res_total = pd.concat(res_total)    
-#     return res_total
+#     return res_total    
 
 
 def sim_costm(d, low_close, high_close, low_far, high_far):
@@ -1654,6 +1701,154 @@ def simulate2d(p_start, p_trans, mean, var, size=1000):
     return lx_noise, ly_noise
 
 
+class ot_hierarchy_sample:
+    
+    def __init__(self, ):
+        self.data = []
+        self.probs = []
+        self.mean_list = []
+        self.cov_list = []
+        self.__d_max = 25
+        for d in range(self.__d_max):
+            self.mean_list.append([-2 + d % 5, -2 + d // 5])
+            self.cov_list.append(np.array([[1 + d % 5, -1 + d % 2],
+                                           [-1 + d % 2, 5 - d % 5]]) * 0.01)
+        self.probs = [np.repeat(1 / 5, 5),
+                      np.repeat(1 / 4, 4),
+                      np.arange(1, 6) / np.sum(np.arange(1, 6)),
+                      np.arange(1, 5) / np.sum(np.arange(1, 5))]
+        for i in range(4):
+            d = self.probs[i].size
+            self.dgp(np.arange(i, i + d), probs=self.probs[i])
+        
+    def dgp(self, sub_index, size=1000, probs=None, index=None, copy=False):
+        d = len(sub_index)
+        if probs is None:
+            probs = np.ones(d) / d
+        x = np.zeros((size, 2))
+        y = np.random.choice(sub_index, size=size, p=probs)
+        for i in range(size):
+            x[i] = np.random.multivariate_normal(self.mean_list[y[i]],self.cov_list[y[i]])
+        if copy:
+            return x, y
+        else:
+            if index is None:
+                self.data.append((x, y))
+            else:
+                self.data[index] = (x, y)
+        
+    def plot(self, *index):
+        for i in range(len(index)):
+            plt.figure()
+            scatter = plt.scatter(self.data[index[i]][0][:, 0], self.data[index[i]][0][:, 1], c=self.data[index[i]][1], s=0.5)
+            plt.legend(*scatter.legend_elements(), title="Clusters")
+            plt.title('data set ' + str(index[i]))
+                      
+    def compute_ot_hier(self, reg, reg1, reg2, index1=None, index2=None, **kwargs):
+        if len(index1) == 1:
+            x1, y1 = self.data[index1]
+        else:
+            x1, y1 = index1
+        if len(index2) == 1:
+            x2, y2 = self.data[index2]
+        else:
+            x2, y2 = index2
+        res_aa = solver.hierarchical_ot(x1, x1, y1, y1, reg, reg1, reg2, **kwargs)
+        res_bb = solver.hierarchical_ot(x2, x2, y2, y2, reg, reg1, reg2, **kwargs)
+        res_ab = solver.hierarchical_ot(x1, x2, y1, y2, reg, reg1, reg2, **kwargs)
+        return {'res': [res_ab, res_aa, res_bb],
+                'loss': res_ab[1] - 0.5 * (res_aa[1] + res_bb[1])}    
+    
+    def compare_runtime(self, list_n, probs_ind1, probs_ind2, reg, reg1, reg2, bal_out=True, bal_in=True, plot=True):
+        p1 = self.probs[probs_ind1]
+        p2 = self.probs[probs_ind2]
+        d1 = len(p1)
+        d2 = len(p2)
+        th = []
+        t = []
+        res_h = []
+        res = []
+        for n in list_n:
+            print('n=' + str(n))
+            x1, y1 = self.dgp(np.arange(d1), size=n, probs=p1, copy=True)
+            x2, y2 = self.dgp(np.arange(d2), size=n, probs=p2, copy=True)
+            th_temp = time.time()
+            res_h = solver.hierarchical_ot(x1, x2, y1, y2, reg, reg1, reg2, bal_out=bal_out, bal_in=bal_in)
+            th.append(time.time() - th_temp)
+            t_temp = time.time()
+            costm = solver.compute_dist(x1, x2, dim=2, single=False)
+            res = solver.ot_unbalanced(np.ones(len(x1)) / len(x1), np.ones(len(x2)) / len(x2), costm, reg, reg1, reg2)
+            t.append(time.time() - t_temp)
+        if plot:
+            df = pd.DataFrame({'n': list_n,
+                               'th': th,
+                               't': t})
+            df.plot(x='n', y=['th', 't'])
+        return {'th': th,
+                't': t,
+                'res_h': res_h,
+                'res': res}
+    
+    def compare_runtime_minibatch(self, list_n, batch_frac, batch_num, probs_ind1, probs_ind2, reg, reg1, reg2, bal_out=True, bal_in=True, plot=True):
+        p1 = self.probs[probs_ind1]
+        p2 = self.probs[probs_ind2]
+        d1 = len(p1)
+        d2 = len(p2)
+        th = []
+        t = []
+        res_h = []
+        res = []
+        for n in list_n:
+            print('n=' + str(n))
+            x1, y1 = self.dgp(np.arange(d1), size=n, probs=p1, copy=True)
+            x2, y2 = self.dgp(np.arange(d2), size=n, probs=p2, copy=True)
+            th_temp = time.time()
+            res_h = self.compute_ot_hier(reg, reg1, reg2, index1=(x1, y1), index2=(x2, y2), bal_out=bal_out, bal_in=bal_in, mini_batch=True, batch_frac=batch_frac, batch_num=batch_num)['loss']
+            th.append(time.time() - th_temp)
+            t_temp = time.time()
+            m = int(batch_frac * n)
+            batch1 = []
+            batch2 = []
+            for i in range(batch_num):
+                batch1.append(np.random.permutation(np.arange(n))[:m + 1])
+                batch2.append(np.random.permutation(np.arange(n))[:m + 1])
+            res_temp = 0
+            for i in range(batch_num):
+                for j in range(batch_num):
+                    res_temp += solver.loss_unbalanced_cont(x1[batch1[i]], x2[batch2[i]], reg, reg1, reg2, dim=2)
+            res.append(res_temp / (batch_num ** 2))
+            t.append(time.time() - t_temp)
+        if plot:
+            df = pd.DataFrame({'n': list_n,
+                               'th': th,
+                               't': t})
+            df.plot(x='n', y=['th', 't'])
+        return {'th': th,
+                't': t,
+                'res_h': res_h,
+                'res': res}
+    
+    def test_cp_detection(self, T, t_cp, reg, reg1, reg2, size=1000, prob1=None, prob2=None):
+        if prob1 is None:
+            prob1 = np.ones(10) / 10
+        if prob2 is None:
+            prob2 = np.arange(1, 11) / np.sum(np.arange(1, 11))
+        data = []
+        for t in range(T + 1):
+            if t < t_cp:
+                y = np.random.choice(np.arange(10), p=prob1, size=size)
+            else:
+                y = np.random.choice(np.arange(10), p=prob2, size=size)
+            x = np.zeros((size, 2))
+            for i in range(size):
+                x[i] = np.random.multivariate_normal(mean=self.mean_list[y[i]], cov=self.cov_list[y[i]])
+            data.append((x, y))
+        res = []
+        for t in range(T):
+            res.append(self.compute_ot_hier(reg, reg1, reg2, index1=data[t], index2=data[t + 1]))
+        return res
+        
+
 class ot_classifier:
     
     def __init__(self, data, n_cluster, reg, reg1, reg2):
@@ -1711,12 +1906,12 @@ class sim_data:
     
     def __init__(self):
         ### default parameters:
-            self.centroids = np.array([[1, 1],
-                                       [1, -1],
-                                       [-1, 1],
-                                       [-1, -1]])
-            self.n_cluster, self.dim = self.centroids.shape
-            self.cov = np.identity(self.dim) * 0.25
+        self.centroids = np.array([[1, 1],
+                                   [1, -1],
+                                   [-1, 1],
+                                   [-1, -1]])
+        self.n_cluster, self.dim = self.centroids.shape
+        self.cov = np.identity(self.dim) * 0.25
             
     def set_cov(self, cov):
         self.cov = cov
@@ -1731,13 +1926,160 @@ class sim_data:
         self.data = data
 
 
+class sim_data_gt:
+
+    def __init__(self, d0=2, d1=1, d2=2, t_list=None, n=500, plot=False, **kwargs):
+        self.set_d(d0, d1, d2)
+        if t_list is not None:
+            self.sample_multi_t(t_list, n, plot=plot, **kwargs)
+            
+    def set_d(self, d0, d1, d2):
+        self.d0_y = self.get_dy(d0)
+        self.d1_y = self.get_dy(d1)
+        self.d2_y = self.get_dy(d2)
+        self.d0 = d0
+        self.d1 = d1
+        self.d2 = d2
+        
+    def get_dy(self, d):
+        if d % 2 == 0:
+            dy = np.arange(d) * 10 + (-5 * d + 5)
+        else:
+            dy = np.arange(d) * 10 + (-10 * (d // 2))
+        return dy
+            
+    def sample_at_t(self, t, n, v=None):
+        data = np.zeros((n, 2))
+        n_start = np.random.binomial(n, 1 - t if t < 1 else 2 - t)
+        n_end = n - n_start
+        if t < 1:
+            x = -10 * self.d0 * (1 - t)
+            d_start = self.d0
+            dy_start = self.d0_y
+            d_end = self.d1
+            dy_end = self.d1_y
+        else:
+            x = 10 * self.d2 * (t - 1)  
+            d_start = self.d1
+            dy_start = self.d1_y
+            d_end = self.d2
+            dy_end = self.d2_y
+        label_start = np.random.choice(np.arange(d_start), size=n_start)
+        label_end = np.random.choice(np.arange(d_end), size=n_end)
+        if v is None:
+            cov = np.diag(np.repeat(1, 2))
+        elif type(v) is float:
+            cov = np.diag(np.repeat(1, 2)) * v
+        else:
+            cov = v
+        for i in range(n_start):
+            data[i] = np.random.multivariate_normal(mean=[x, dy_start[label_start[i]]],
+                                                    cov=cov)
+        for i in range(n_start, n):
+            data[i] = np.random.multivariate_normal(mean=[x, dy_end[label_end[i - n_start]]],
+                                                    cov=cov)
+        return data
+    
+    def sample_at_t_ring(self, t, n, r_loc=1, r_scale=0.25, h=0.1, gamma=0.1):
+        if t == 0 or t == 1:
+            gamma = 0
+        sample = np.zeros((n, 2))
+        n_ring = np.random.binomial(n, 1 - gamma)
+        for i in range(n_ring):
+            theta = np.random.uniform(np.pi * (t - h), np.pi * (t + h))
+            r = np.random.normal(r_loc, r_scale)
+            sign = np.random.choice([-1, 1])
+            sample[i, 0] = r * np.cos(sign * theta)
+            sample[i, 1] = r * np.sin(sign * theta)
+        x_low = (r_loc - 1.5 * r_scale) * np.cos(np.pi * (t + h))
+        x_high = (r_loc - 1.5 * r_scale) * np.cos(np.pi * (t - h))
+        y_low = (r_loc - 1.5 * r_scale) * np.sin(-np.pi * t)
+        y_high = (r_loc - 1.5 * r_scale) * np.sin(np.pi * t)
+        for j in range(n_ring, n):
+            sample[j, 0] = np.random.uniform(x_low, x_high)
+            sample[j, 1] = np.random.uniform(y_low, y_high)
+        return sample           
+    
+    def sample_multi_t(self, t_list, n, method='2d', plot=False, **kwargs):
+        if method == '2d':
+            sample_method = self.sample_at_t
+        elif method == 'ring':
+            sample_method = self.sample_at_t_ring
+        else:
+            sample_method = self.sample_at_t
+        data = []
+        for t in t_list:
+            data.append(sample_method(t, n, **kwargs))
+        data = np.hstack((np.vstack(data), np.repeat(t_list, n).reshape(-1, 1)))
+        data = pd.DataFrame(data=data, columns=['x', 'y', 't'])
+        self.t_list=t_list
+        self.data=data
+        if plot:
+            self.plot_data()
+    
+    def update_cost_payoff_tmap_balanced(self, h, reg, eta, plot_sample=False):
+        T = len(self.t_list) - 1
+        self.cost = []
+        self.payoff = []
+        data = [self.data.loc[self.data.t == t, ['x', 'y']].to_numpy() for t in t_list]
+        for t in range(T):
+            x1 = data[t]
+            x2 = data[t + 1]
+            # self.cost.append(solver.compute_dist(x1, x2, dim=2, single=False))
+            self.cost.append(0.5 * (solver.compute_dist(x1, x2, dim=2, single=False) ** 2))
+        self.payoff = compute_payoff_all_t(data, h)
+        self.tmap = compute_otgt_balanced_all_t(data, self.payoff, reg, eta, n_iter=10000)
+        if plot_sample:
+            self.plot_sample_path()
+            
+    def update_cost_payoff_tmap_unbalanced(self, h, reg, reg1, reg2, eta, plot_sample=False):
+        T = len(self.t_list) - 1
+        self.cost = []
+        self.payoff = []
+        data = [self.data.loc[self.data.t == t, ['x', 'y']].to_numpy() for t in t_list]
+        for t in range(T):
+            x1 = data[t]
+            x2 = data[t + 1]
+            # self.cost.append(solver.compute_dist(x1, x2, dim=2, single=False))
+            self.cost.append(0.5 * (solver.compute_dist(x1, x2, dim=2, single=False) ** 2))
+        self.payoff = compute_payoff_all_t(data, h)
+        self.tmap = compute_otgt_unbalanced_all_t(data, self.payoff, reg, reg1, reg2, eta, n_iter=10000)
+        if plot_sample:
+            self.plot_sample_path() 
+   
+    def plot_data(self):
+        plt.figure(figsize=(10, 8))
+        sns.scatterplot(data=self.data, x='x', y='y', hue='t', s=4, palette=sns.color_palette('viridis',len(self.t_list)), edgecolor='none')
+        plt.legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
+     
+    def plot_sample_path(self):
+        data = [self.data.loc[self.data.t == t, ['x', 'y']].to_numpy() for t in t_list]
+        sample_path(data[0], data[1:], self.tmap, n_sim=50, plot=True)
+            
+
+# OT classifier test
+##################################################
+
 # x = sim_data()
 # x.generate_sample(size=1000, weight=[0.1, 0.2, 0.3, 0.4])
 # ctool = ot_classifier(x.data, 4, 0.05, 1, 1)
 # ctool.run_classifier(n_iter=50)
 # # ctool.plot()
 # plt.plot(ctool.obj)
-            
+
+# OTGT test
+##################################################
+
+
+np.random.seed(888)
+# t_list = np.linspace(0, 2, 6)
+# otgt = sim_data_gt(1, 2, 1, t_list, n=500)
+# otgt.update_cost_payoff_tmap_unbalanced(h=10, reg=10, reg1=0, reg2=1, eta=0.5, plot_sample=True)
+t_list = np.linspace(0, 1, 5)
+otgt = sim_data_gt(t_list=t_list, n=1000, plot=True, method='ring', r_loc=5, r_scale=0.5, h=0.15, gamma=0.15)
+otgt.update_cost_payoff_tmap_unbalanced(h=0.1, reg=10, reg1=0, reg2=0.001, eta=1, plot_sample=True)           
+
+
 # test data
 ##################################################
 # import seaborn as sns

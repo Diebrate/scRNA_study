@@ -37,6 +37,7 @@ time_labels = [float(i[1:]) for i in time_names]
 sample_size = pd.DataFrame()
 sample_size['day'] = time_labels
 sample_size['sample size'] = df.groupby('day').size().to_numpy()
+sample_size.to_csv(r'..\results\sample_size.csv')
 
 T = len(time_labels)
 k = len(np.unique(df['cell type']))
@@ -103,7 +104,7 @@ ax.set_title(r'Time vs Loss with PHATE Embedding', size = 20)
 plt.legend()
 plt.savefig(r'..\image\wot_res')
 
-graph_tmap = True
+graph_tmap = False
 
 if graph_tmap:
     for i in range(T - 1):
