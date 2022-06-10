@@ -28,7 +28,7 @@ for t in range(T):
     # g[t, ] = np.concatenate((np.sin(2 * np.arange(ind, ind + sep) * np.pi / sep), 
     #                          np.cos(2 * np.arange(ind, ind + d - sep) * np.pi / (d - sep))))
     g[t, ] = np.exp(g[t, ])
-M = 30
+M = 500
 
 costm = test_util.constant_costm(d, 1, 2)
 reg = 0.05
@@ -40,14 +40,14 @@ n_conv = 5
 
 seed = 99999
 
-do_sim = False
-do_load = True
-do_tune = True
-do_test = True
-do_comp = True
+do_sim = True
+do_load = False
+do_tune = False
+do_test = False
+do_comp = False
 
 ### shortcut setup
-do_sim = do_load = do_tune = do_test = do_comp = False
+# do_sim = do_load = do_tune = do_test = do_comp = False
 ###
 
 data_type = 'g'
@@ -56,6 +56,11 @@ win_size = 2
 weight = None
 switch = False
 multimarg = False
+
+use_sys = True
+if use_sys:
+    import sys
+    data_type = sys.argv[1]
 
 index = ['OT', 'MN', 'ECP']
 name_setting = ('' if win_size is None else '_m' + str(win_size)) + ('' if weight is None else '_' + weight)
