@@ -2,9 +2,9 @@ clc
 offsets = [true, false];
 for offset = offsets
     if offset
-        load ..\..\results\simulation\multisetting_data_cor.mat
+        load ../../results/simulation/multisetting_data_cor.mat
     else
-        load ..\..\results\simulation\multisetting_data.mat
+        load ../../results/simulation/multisetting_data.mat
     end
     n_ns = length(ns); n_nus = length(nus); n_zetas = length(zetas);
     T = double(T); p = double(p);
@@ -71,8 +71,8 @@ for offset = offsets
         end
     end
     if offset
-        save ..\..\results\simulation\multisetting_res_mn_cor.mat
+        save ../../results/simulation/multisetting_res_mn_cor.mat
     else
-        save ..\..\results\simulation\multisetting_res_mn.mat
+        save ../../results/simulation/multisetting_res_mn.mat
     end
 end

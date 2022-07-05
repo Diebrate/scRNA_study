@@ -2,11 +2,12 @@ import numpy as np
 import pandas as pd
 import anndata
 import matplotlib.pyplot as plt
-import util
-import solver
 
 import os
+import sys
+sys.path.insert(0,'..')
 import test_util
+import solver
 os.chdir('..\preproc')
 
 import time
@@ -18,7 +19,7 @@ sink = True
 win_size = 2
 weight = None
 
-cost_disc = False
+cost_disc = True
 cost_cont = False
 
 load_cost = True
@@ -61,11 +62,12 @@ for t in range(T):
 probs = np.array(probs)
 probs_exact = np.array(probs_exact)
 costm = test_util.get_cost_matrix(centroids, centroids, dim=dim)
+costm = costm / np.median(costm)
 cost = solver.loss_unbalanced_all_local(probs, costm, reg, reg1, reg2, sink=sink, win_size=win_size, weight=weight)
 cost_partial = solver.loss_unbalanced_all_local(probs_exact, costm, reg, reg1, reg2, sink=sink, win_size=win_size, weight=weight, partial=True)
 
 ### normalization
-cost = cost / np.sum(cost)
+# cost = cost / np.sum(cost)
 cost = np.append(cost, np.nan)
 
 cp = test_util.get_cp_from_cost(cost, win_size=win_size)
@@ -86,12 +88,13 @@ if load_cost:
     local_cost_cont = np.load(r'..\results\cost_local_cont.npy')
     
 cost_disc_m = [solver.get_weighted_cost(local_cost_disc, weight=weight, win_size=i) for i in [1, 2, 3, 4]]
-cost_cont_m = [solver.get_weighted_cost(local_cost_cont, weight=weight, win_size=i) for i in [1, 2, 3, 4]]
+# cost_cont_m = [solver.get_weighted_cost(local_cost_cont, weight=weight, win_size=i) for i in [1, 2, 3, 4]]
 
 ### normalizing the cost
 for i in range(4):
-    cost_disc_m[i] = cost_disc_m[i] / np.sum(cost_disc_m[i])
-    cost_cont_m[i] = cost_cont_m[i] / np.sum(cost_cont_m[i])
+    # cost_disc_m[i] = cost_disc_m[i] / np.sum(cost_disc_m[i])
+    cost_disc_m[i][:i + 1] = 0
+    # cost_cont_m[i] = cost_cont_m[i] / np.sum(cost_cont_m[i])
 
 x = list(range(T - 1))
 # z = np.polyfit(x, [float(i) for i in cost], 7)
@@ -105,7 +108,7 @@ fig, ax = plt.subplots(figsize=(10,8))
 # ax.legend()
 for i in range(4):
     ax.plot(x, cost_disc_m[i], label='clustered with win-size=' + str(i + 1))
-    ax.plot(x, cost_cont_m[i], label='original with win-size=' + str(i + 1))
+    # ax.plot(x, cost_cont_m[i], label='original with win-size=' + str(i + 1))
 ax.set_xticks(x)
 ax.set_xticklabels(time_names[:-1], rotation=70, size=10)
 ax.set_xlabel('Time', size=20)

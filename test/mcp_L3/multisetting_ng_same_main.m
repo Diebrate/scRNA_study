@@ -1,5 +1,5 @@
 clc
-load ..\..\results\simulation\multisetting_data_ng.mat
+load ../../results/simulation/multisetting_data_ng.mat
 n_ns = length(ns); n_etas = length(etas);
 T = double(T); p = double(p);
 c0_A = 2.0; 
@@ -59,4 +59,4 @@ for i=1:n_ns
     end
 end
 toc; 
-save ..\..\results\simulation\multisetting_res_mn_ng.mat
+save ../../results/simulation/multisetting_res_mn_ng.mat

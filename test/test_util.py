@@ -1162,12 +1162,14 @@ def get_prob_ng_all(T, d, cp, eta):
     return p
 
 
-def check_unbalanced_tmap_conv(p1, p2, d, costm, reg, reg1, reg2, n_size, n_sim):
+def check_unbalanced_tmap_conv(p1, p2, d, costm, reg, reg1, reg2, n_size, n_sim, tune=False):
     p1_sim = np.zeros((n_sim, d))
     p2_sim = np.zeros((n_sim, d))
     for i in range(n_sim):
         p1_sim[i, ] = np.random.multinomial(n_size, p1) / n_size
         p2_sim[i, ] = np.random.multinomial(n_size, p2) / n_size
+    if tune:
+        reg_opt = solver.optimal_lambda_ts(probs_all[coord][m], costm, reg, grid_min, grid_max)['opt_lambda']
     tmap_sim = solver.ot_unbalanced_all(p1_sim.T, p2_sim.T, costm, reg, reg1, reg2)
     tmap_real = solver.ot_unbalanced(p1, p2, costm, reg, reg1, reg2)
     diff_sim = tmap_compare_mc(tmap_sim, tmap_real)
@@ -2071,13 +2073,13 @@ class sim_data_gt:
 ##################################################
 
 
-np.random.seed(888)
-# t_list = np.linspace(0, 2, 6)
-# otgt = sim_data_gt(1, 2, 1, t_list, n=500)
-# otgt.update_cost_payoff_tmap_unbalanced(h=10, reg=10, reg1=0, reg2=1, eta=0.5, plot_sample=True)
-t_list = np.linspace(0, 1, 5)
-otgt = sim_data_gt(t_list=t_list, n=1000, plot=True, method='ring', r_loc=5, r_scale=0.5, h=0.15, gamma=0.15)
-otgt.update_cost_payoff_tmap_unbalanced(h=0.1, reg=10, reg1=0, reg2=0.001, eta=1, plot_sample=True)           
+# np.random.seed(888)
+# # t_list = np.linspace(0, 2, 6)
+# # otgt = sim_data_gt(1, 2, 1, t_list, n=500)
+# # otgt.update_cost_payoff_tmap_unbalanced(h=10, reg=10, reg1=0, reg2=1, eta=0.5, plot_sample=True)
+# t_list = np.linspace(0, 1, 5)
+# otgt = sim_data_gt(t_list=t_list, n=1000, plot=True, method='ring', r_loc=5, r_scale=0.5, h=0.15, gamma=0.15)
+# otgt.update_cost_payoff_tmap_unbalanced(h=0.1, reg=10, reg1=0, reg2=0.001, eta=1, plot_sample=True)           
 
 
 # test data

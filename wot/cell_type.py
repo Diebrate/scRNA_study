@@ -63,7 +63,7 @@ full_df = pd.read_csv(r'data\full_df.csv')
 full_df = full_df[full_df['day'] != 8.25]
 full_df = full_df[full_df['day'] != 8.75]
 
-get_ot = True
+get_ot = False
 seurat = True
 do_hv = False
 cond1 = 'serum'
@@ -99,13 +99,15 @@ ot_df = pd.read_csv(r'..\data\proc_data\ot_df.csv')
 ot_df = ot_df[ot_df['day'] != 8.25]
 ot_df = ot_df[ot_df['day'] != 8.75]
 
-plot = None
+plot = 'schiebinger'
 
 if plot == 'schiebinger':
     
     fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True, figsize=(15, 8))
     scatter = ax[0].scatter(x=full_df['x'], y=full_df['y'], s=0.25, c=full_df['day'])
     ax[0].legend(*scatter.legend_elements(num=19), title='day')
+    ax[0].set_xlabel('x')
+    ax[0].set_ylabel('y')
 
     sns.scatterplot(x='x', y='y', data=full_df, hue='cell type', linewidth=0, s=1, ax=ax[1])
 
@@ -114,10 +116,12 @@ elif plot == 'seurat':
     fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True, figsize=(15, 8))
     scatter = ax[0].scatter(x=ot_df['x'], y=ot_df['y'], s=0.25, c=ot_df['day'])
     ax[0].legend(*scatter.legend_elements(num=19), title='day')
+    ax[0].set_xlabel('x')
+    ax[0].set_ylabel('y')
 
     sns.scatterplot(x='x', y='y', data=ot_df, hue='cell type', linewidth=0, s=1, ax=ax[1])
 
-check_gene = True
+check_gene = False
 gene_list = ['Fut9', 'Shisa8', 'Dmrtc2', 'Zic3', 'Pou3f1']
 if check_gene:
     raw_df = wot.io.read_dataset(r'..\data\proc_data\proc_df_full_no_seurat.h5ad')

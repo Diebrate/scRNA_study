@@ -2,11 +2,12 @@ import numpy as np
 import pandas as pd
 import anndata
 import matplotlib.pyplot as plt
-import util
-import solver
 
 import os
+import sys
+sys.path.insert(0,'..')
 import test_util
+import solver
 os.chdir('..\preproc')
 
 import time
@@ -19,7 +20,7 @@ weight = None
 do_cost = True
 do_load = True
 
-reg = 0.01
+reg = 0.05
 reg1 = 1
 reg2 = 1
 
@@ -55,7 +56,7 @@ for t in range(T):
 probs = np.array(probs)
 costm = test_util.get_cost_matrix(centroids, centroids, dim=dim)
 # costm = costm / 100000
-# costm = costm / np.sum(costm)
+# costm = costm / np.median(costm)
 reg_opt = solver.optimal_lambda_ts(probs, costm, reg, 0, 10)['opt_lambda']
 # reg1 = reg2 = reg_opt
 tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=reg, reg1=reg_opt, reg2=50)
@@ -102,9 +103,9 @@ ax.set_xlabel('Time', size=20)
 ax.set_ylabel('Loss', size=20)
 ax.set_title(r'Time vs Loss with PHATE Embedding', size = 20)
 plt.legend()
-plt.savefig(r'..\image\wot_res')
+# plt.savefig(r'..\image\wot_res')
 
-graph_tmap = False
+graph_tmap = True
 
 if graph_tmap:
     for i in range(T - 1):
@@ -116,6 +117,6 @@ if graph_tmap:
         ax.set_xticklabels(np.insert(type_list, 0, ''), rotation=20)
         ax.set_yticklabels(np.insert(type_list, 0, ''))
         reform_time_name = time_names[i].replace('.', '_') + 'to' + time_names[i+1].replace('.', '_')
-        plt.savefig(r'..\image\wot_tmap\transport_map_'+reform_time_name)
+        # plt.savefig(r'..\image\wot_tmap\transport_map_'+reform_time_name)
 
 print("--- %s seconds ---" % (time.time() - start_time))

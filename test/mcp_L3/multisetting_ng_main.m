@@ -1,5 +1,5 @@
 clc
-load ..\..\results\simulation\multisetting_data_ng.mat
+load ../../results/simulation/multisetting_data_ng.mat
 n_ns = length(ns); n_pwrs = length(pwrs);
 T = double(T); p = double(p);
 c0_A = 2.0; 

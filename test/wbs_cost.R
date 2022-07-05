@@ -3,7 +3,7 @@ library(ecp)
 library(reticulate)
 
 set.seed(12345)
-setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+# setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 
 np <- import("numpy")
 
@@ -153,7 +153,7 @@ for(offset in offsets){
   }else{
     prob_all <- np$load('../results/simulation/multisetting_data_prob.npy', allow_pickle=TRUE)
   }
-  prob_all_ng <- np$load('../results/simulation/multisetting_data_prob_ng.npy', allow_pickle=TRUE)
+  # prob_all_ng <- np$load('../results/simulation/multisetting_data_prob_ng.npy', allow_pickle=TRUE)
   
   # res_all <- np$load('../results/simulation/multisetting_rtemplate.npy', allow_pickle=TRUE)
   # res_all_ng <- np$load('../results/simulation/multisetting_rtemplate_ng.npy', allow_pickle=TRUE)
@@ -183,7 +183,7 @@ for(offset in offsets){
   # res_ot_wbs_ng <- wbs_from_prob_ng(prob_all_ng)
   
   res_ot_ecp <- ecp_from_prob(prob_all)
-  res_ot_ecp_ng <- ecp_from_prob_ng(prob_all_ng)
+  # res_ot_ecp_ng <- ecp_from_prob_ng(prob_all_ng)
   
   # if(offset){
   #   np$save('../results/simulation/multisetting_res_wbs_cor.npy', res_ot_wbs)
@@ -197,12 +197,16 @@ for(offset in offsets){
   }else{
     np$save('../results/simulation/multisetting_res_ecp.npy', res_ot_ecp)
   }
-  np$save('../results/simulation/multisetting_res_ecp_ng.npy', res_ot_ecp_ng)
+  # np$save('../results/simulation/multisetting_res_ecp_ng.npy', res_ot_ecp_ng)
   
   # saveRDS(res_ot_wbs, '../results/simulation/multisetting_res_wbs.rds')
   # saveRDS(res_ot_wbs_ng, '../results/simulation/multisetting_res_wbs_ng.rds')
 
 }
+
+prob_all_ng <- np$load('../results/simulation/multisetting_data_prob_ng.npy', allow_pickle=TRUE)
+res_ot_ecp_ng <- ecp_from_prob_ng(prob_all_ng)
+np$save('../results/simulation/multisetting_res_ecp_ng.npy', res_ot_ecp_ng)
 
 
 

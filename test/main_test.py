@@ -28,9 +28,10 @@ for t in range(T):
     # g[t, ] = np.concatenate((np.sin(2 * np.arange(ind, ind + sep) * np.pi / sep), 
     #                          np.cos(2 * np.arange(ind, ind + d - sep) * np.pi / (d - sep))))
     g[t, ] = np.exp(g[t, ])
-M = 500
+M = 100
 
 costm = test_util.constant_costm(d, 1, 2)
+costm = costm / np.median(costm)
 reg = 0.05
 reg1 = 1
 reg2 = 1
@@ -40,27 +41,34 @@ n_conv = 5
 
 seed = 99999
 
-do_sim = True
-do_load = False
+do_sim = False
+do_load = True
 do_tune = False
-do_test = False
-do_comp = False
+do_test = True
+do_comp = True
 
 ### shortcut setup
-# do_sim = do_load = do_tune = do_test = do_comp = False
+do_sim = do_load = do_tune = do_test = do_comp = False
 ###
 
 data_type = 'g'
-offset = True
+offset = False
 win_size = 2
 weight = None
 switch = False
 multimarg = False
 
-use_sys = True
+use_sys = False
 if use_sys:
     import sys
     data_type = sys.argv[1]
+    choice = int(sys.argv[2])
+    if choice == 0:
+        do_sim = True
+        do_load = do_tune = do_test = do_comp = False
+    else:
+        do_sim = False
+        do_load = do_tune = do_test = do_comp = True
 
 index = ['OT', 'MN', 'ECP']
 name_setting = ('' if win_size is None else '_m' + str(win_size)) + ('' if weight is None else '_' + weight)
@@ -78,12 +86,12 @@ potential model performance evaluation.
 
 do_check = False
 do_cost = False
-do_param_select = False
+do_param_select = True
 n_sim = 100
 ns_size = [100, 1000, 10000]
 n_grid = 100
 grid_min = 0
-grid_max = 5
+grid_max = 10
 time_check = 20
 nu_check = 0
 eta_check = 1
@@ -121,7 +129,7 @@ if do_check:
 if do_cost:
     import matplotlib.pyplot as plt
     
-    fig, ax = plt.subplots(nrows=len(nus), ncols=len(etas), figsize = (10, 10))
+    fig, ax = plt.subplots(nrows=len(nus), ncols=len(etas), figsize=(10, 10))
     for i in range(len(nus)):
         for j in range(len(etas)):
             real_cost = solver.loss_unbalanced_all_local(real_prob[i, j], costm, reg, reg1, reg2, win_size=win_size, sink=sink)
@@ -138,10 +146,10 @@ if do_cost:
             ax[i, j].set_title('nu = ' + str(nus[i]) + ', eta = ' + str(etas[j]))
     fig.suptitle('growth')
     fig.text(0.5, 0.04, 'time', ha='center', fontsize=14)
-    fig.text(0.04, 0.5, 'cost', va='center', rotation='vertical', fontsize=14)
+    fig.text(0.04, 0.5, 'div', va='center', rotation='vertical', fontsize=14)
     fig.legend(*ax[0, 0].get_legend_handles_labels(), loc='upper right')
     
-    fig_ng, ax_ng = plt.subplots(nrows=len(etas), figsize = (8, 8))
+    fig_ng, ax_ng = plt.subplots(nrows=len(etas), figsize=(8, 8))
     for i in range(len(etas)):
         real_cost_ng = solver.loss_unbalanced_all_local(real_prob_ng[i], costm, reg, reg1, reg2, win_size=win_size, sink=sink)
         p_low_n_ng = np.zeros((T + 1, d))
@@ -157,7 +165,7 @@ if do_cost:
         ax_ng[i].set_title('eta = ' + str(etas[i]))
     fig_ng.suptitle('no growth')
     fig_ng.text(0.5, 0.04, 'time', ha='center', fontsize=14)
-    fig_ng.text(0.04, 0.5, 'cost', va='center', rotation='vertical', fontsize=14)
+    fig_ng.text(0.04, 0.5, 'div', va='center', rotation='vertical', fontsize=14)
     fig_ng.legend(*ax_ng[0].get_legend_handles_labels(), loc='upper right')
     
 # the following part is for parameter tuning
@@ -166,6 +174,7 @@ if do_param_select:
     import matplotlib.pyplot as plt
     
     res_tune = solver.optimal_lambda_ts(real_prob[nu_check, eta_check], costm, reg, grid_min, grid_max, grid_size=n_grid)
+    plt.figure(figsize=(8, 8))
     plt.plot(np.linspace(grid_min, grid_max, n_grid + 1)[1:], res_tune['obj_func'])
     plt.xlabel('lambda')
     plt.ylabel('objection function')
@@ -201,16 +210,16 @@ if do_sim:
                     tmap_all[i, j, k] = solver.ot_unbalanced_all_mc(prob_all[i, j, k], costm, reg, reg1, reg2)
                     cost_cor[i, j, k] = test_util.get_ot_unbalanced_cost_local_mc(prob_cor[i, j, k], costm, reg, reg1, reg2, sink=sink, win_size=win_size, weight=weight)
                     tmap_cor[i, j, k] = solver.ot_unbalanced_all_mc(prob_cor[i, j, k], costm, reg, reg1, 50)
-        np.save(r'..\results\simulation\multisetting_data.npy', data_all)
-        np.save(r'..\results\simulation\multisetting_data_prob.npy', prob_all)
-        np.save(r'..\results\simulation\multisetting_data_prob_cor.npy', prob_cor)
-        np.save(r'..\results\simulation\multisetting_data_cost' + name_setting + '.npy', cost_all)
-        np.save(r'..\results\simulation\multisetting_data_cost_cor' + name_setting + '.npy', cost_cor)
-        # np.save(r'..\results\simulation\multisetting_data_cost_mm' + name_setting + '.npy', cost_marg_all)
-        np.save(r'..\results\simulation\multisetting_data_tmap' + name_setting + '.npy', tmap_all)
-        np.save(r'..\results\simulation\multisetting_data_tmap_cor' + name_setting + '.npy', tmap_cor)
-        scipy.io.savemat(r'..\results\simulation\multisetting_data.mat', dict(data=data_mat, ns=ns, zetas=etas, nus=nus, M=M, T=T, p=d))
-        scipy.io.savemat(r'..\results\simulation\multisetting_data_cor.mat', dict(data=data_cor, ns=ns, zetas=etas, nus=nus, M=M, T=T, p=d))
+        np.save(r'../results/simulation/multisetting_data.npy', data_all)
+        np.save(r'../results/simulation/multisetting_data_prob.npy', prob_all)
+        np.save(r'../results/simulation/multisetting_data_prob_cor.npy', prob_cor)
+        np.save(r'../results/simulation/multisetting_data_cost' + name_setting + '.npy', cost_all)
+        np.save(r'../results/simulation/multisetting_data_cost_cor' + name_setting + '.npy', cost_cor)
+        # np.save(r'../results/simulation/multisetting_data_cost_mm' + name_setting + '.npy', cost_marg_all)
+        np.save(r'../results/simulation/multisetting_data_tmap' + name_setting + '.npy', tmap_all)
+        np.save(r'../results/simulation/multisetting_data_tmap_cor' + name_setting + '.npy', tmap_cor)
+        scipy.io.savemat(r'../results/simulation/multisetting_data.mat', dict(data=data_mat, ns=ns, zetas=etas, nus=nus, M=M, T=T, p=d))
+        scipy.io.savemat(r'../results/simulation/multisetting_data_cor.mat', dict(data=data_cor, ns=ns, zetas=etas, nus=nus, M=M, T=T, p=d))
     elif data_type == 'ng':
         if switch:
             data_all = np.empty((len(ns), len(pwrs)), dtype=object)
@@ -227,7 +236,7 @@ if do_sim:
                     cost_all[i, j] = test_util.get_ot_unbalanced_cost_local_mc(prob_all[i, j], costm, reg, reg1, reg2, sink=sink, win_size=win_size, weight=weight)
                     # cost_marg_all[i, j] = test_util.get_ot_unbalanced_cost_mm_mc(prob_all[i, j], costm, reg, reg1, coeff=weight, win_size=win_size)
                     tmap_all[i, j] = solver.ot_unbalanced_all_mc(prob_all[i, j], costm, reg, reg1, reg2)
-            scipy.io.savemat(r'..\results\simulation\multisetting_data_ng.mat', dict(data=data_mat, ns=ns, pwrs=pwrs, M=M, T=T, p=d))
+            scipy.io.savemat(r'../results/simulation/multisetting_data_ng.mat', dict(data=data_mat, ns=ns, pwrs=pwrs, M=M, T=T, p=d))
         else:
             data_all = np.empty((len(ns), len(etas)), dtype=object)
             data_mat = np.empty((len(ns), len(etas)), dtype=object)
@@ -244,12 +253,12 @@ if do_sim:
                     cost_all[i, j] = test_util.get_ot_unbalanced_cost_local_mc(prob_all[i, j], costm, reg, reg1, reg2, sink=sink, win_size=win_size, weight=weight)
                     # cost_marg_all[i, j] = test_util.get_ot_unbalanced_cost_mm_mc(prob_all[i, j], costm, reg, reg1, coeff=weight, win_size=win_size)
                     tmap_all[i, j] = solver.ot_unbalanced_all_mc(prob_all[i, j], costm, reg, reg1, reg2)
-            scipy.io.savemat(r'..\results\simulation\multisetting_data_ng.mat', dict(data=data_mat, ns=ns, etas=etas, M=M, T=T, p=d))
-        np.save(r'..\results\simulation\multisetting_data_ng.npy', data_all)
-        np.save(r'..\results\simulation\multisetting_data_prob_ng.npy', prob_all)
-        np.save(r'..\results\simulation\multisetting_data_cost_ng' + name_setting + '.npy', cost_all)
-        # np.save(r'..\results\simulation\multisetting_data_cost_ng_mm' + name_setting + '.npy', cost_marg_all)
-        np.save(r'..\results\simulation\multisetting_data_tmap_ng' + name_setting + '.npy', tmap_all)
+            scipy.io.savemat(r'../results/simulation/multisetting_data_ng.mat', dict(data=data_mat, ns=ns, etas=etas, M=M, T=T, p=d))
+        np.save(r'../results/simulation/multisetting_data_ng.npy', data_all)
+        np.save(r'../results/simulation/multisetting_data_prob_ng.npy', prob_all)
+        np.save(r'../results/simulation/multisetting_data_cost_ng' + name_setting + '.npy', cost_all)
+        # np.save(r'../results/simulation/multisetting_data_cost_ng_mm' + name_setting + '.npy', cost_marg_all)
+        np.save(r'../results/simulation/multisetting_data_tmap_ng' + name_setting + '.npy', tmap_all)
     n_temp = len(pwrs) if switch else len(etas)
     res_rtemp_ng = np.empty((len(ns), n_temp), dtype=object)
     res_rtemp = np.empty((len(ns), len(nus), len(etas)), dtype=object)
@@ -259,33 +268,33 @@ if do_sim:
         for j in range(len(nus)):
             for k in range(len(etas)):
                 res_rtemp[i, j, k] = np.zeros((M, T + 1))
-    np.save(r'..\results\simulation\multisetting_rtemplate_ng.npy', res_rtemp_ng)
-    np.save(r'..\results\simulation\multisetting_rtemplate.npy', res_rtemp)
+    np.save(r'../results/simulation/multisetting_rtemplate_ng.npy', res_rtemp_ng)
+    np.save(r'../results/simulation/multisetting_rtemplate.npy', res_rtemp)
 
     
 if do_load:
     if data_type == 'g':
-        data_all = np.load(r'..\results\simulation\multisetting_data.npy', allow_pickle=True)
-        prob_all = np.load(r'..\results\simulation\multisetting_data_prob.npy', allow_pickle=True)
-        tmap_all = np.load(r'..\results\simulation\multisetting_data_tmap' + name_setting + '.npy', allow_pickle=True)
-        prob_cor = np.load(r'..\results\simulation\multisetting_data_prob_cor.npy', allow_pickle=True)
-        tmap_cor = np.load(r'..\results\simulation\multisetting_data_tmap_cor' + name_setting + '.npy', allow_pickle=True)
+        data_all = np.load(r'../results/simulation/multisetting_data.npy', allow_pickle=True)
+        prob_all = np.load(r'../results/simulation/multisetting_data_prob.npy', allow_pickle=True)
+        tmap_all = np.load(r'../results/simulation/multisetting_data_tmap' + name_setting + '.npy', allow_pickle=True)
+        prob_cor = np.load(r'../results/simulation/multisetting_data_prob_cor.npy', allow_pickle=True)
+        tmap_cor = np.load(r'../results/simulation/multisetting_data_tmap_cor' + name_setting + '.npy', allow_pickle=True)
         if multimarg:
-            cost_all = np.load(r'..\results\simulation\multisetting_data_cost_mm' + name_setting + '.npy', allow_pickle=True)
+            cost_all = np.load(r'../results/simulation/multisetting_data_cost_mm' + name_setting + '.npy', allow_pickle=True)
         else:
-            cost_all = np.load(r'..\results\simulation\multisetting_data_cost' + name_setting + '.npy', allow_pickle=True)
-        cost_cor = np.load(r'..\results\simulation\multisetting_data_cost_cor' + name_setting + '.npy', allow_pickle=True)
+            cost_all = np.load(r'../results/simulation/multisetting_data_cost' + name_setting + '.npy', allow_pickle=True)
+        cost_cor = np.load(r'../results/simulation/multisetting_data_cost_cor' + name_setting + '.npy', allow_pickle=True)
     elif data_type == 'ng':
-        data_all = np.load(r'..\results\simulation\multisetting_data_ng.npy', allow_pickle=True)
-        prob_all = np.load(r'..\results\simulation\multisetting_data_prob_ng.npy', allow_pickle=True)
-        tmap_all = np.load(r'..\results\simulation\multisetting_data_tmap_ng' + name_setting + '.npy', allow_pickle=True)
+        data_all = np.load(r'../results/simulation/multisetting_data_ng.npy', allow_pickle=True)
+        prob_all = np.load(r'../results/simulation/multisetting_data_prob_ng.npy', allow_pickle=True)
+        tmap_all = np.load(r'../results/simulation/multisetting_data_tmap_ng' + name_setting + '.npy', allow_pickle=True)
         if multimarg:
-            cost_all = np.load(r'..\results\simulation\multisetting_data_cost_ng_mm' + name_setting + '.npy', allow_pickle=True)
+            cost_all = np.load(r'../results/simulation/multisetting_data_cost_ng_mm' + name_setting + '.npy', allow_pickle=True)
         else:
-            cost_all = np.load(r'..\results\simulation\multisetting_data_cost_ng' + name_setting + '.npy', allow_pickle=True)
+            cost_all = np.load(r'../results/simulation/multisetting_data_cost_ng' + name_setting + '.npy', allow_pickle=True)
     if do_tune:
         ot_tune = test_util.ot_analysis_tuning(prob_all, costm, reg, 
-                                               file_path=r'..\results\simulation\multisetting_data_' + ('g' if data_type == 'g' else 'ng'),
+                                               file_path=r'../results/simulation/multisetting_data_g',
                                                grid_min=grid_min,
                                                grid_max=grid_max,
                                                grid_size=n_grid,
@@ -296,73 +305,72 @@ if do_load:
         tmap_tune = ot_tune['tmap']
         reg1_tune = ot_tune['reg1']
     else:
-        cost_tune = np.load(r'..\results\simulation\multisetting_data_' + ('g' if data_type == 'g' else 'ng') + '_cost_tuning' + name_setting + '.npy', allow_pickle=True)
-        tmap_tune = np.load(r'..\results\simulation\multisetting_data_' + ('g' if data_type == 'g' else 'ng') + '_tmap_tuning' + name_setting + '.npy', allow_pickle=True)
-        reg1_tune = np.load(r'..\results\simulation\multisetting_data_' + ('g' if data_type == 'g' else 'ng') + '_reg1' + name_setting + '.npy', allow_pickle=True)
+        cost_tune = np.load(r'../results/simulation/multisetting_data_g' + '_cost_tuning' + name_setting + '.npy', allow_pickle=True)
+        tmap_tune = np.load(r'../results/simulation/multisetting_data_g' + '_tmap_tuning' + name_setting + '.npy', allow_pickle=True)
+        reg1_tune = np.load(r'../results/simulation/multisetting_data_g' + '_reg1' + name_setting + '.npy', allow_pickle=True)
         
 
 if do_test:
     if data_type == 'g':
         res_ot = test_util.multisetting_cp_ot_cost(cost_all, T, win_size=win_size)
-        np.save(r'..\results\simulation\multisetting_res_ot' + name_setting + '.npy', res_ot)
+        np.save(r'../results/simulation/multisetting_res_ot' + name_setting + '.npy', res_ot)
         res_cor = test_util.multisetting_cp_ot_cost(cost_cor, T, win_size=win_size)
-        np.save(r'..\results\simulation\multisetting_res_ot_cor' + name_setting + '.npy', res_cor)
+        np.save(r'../results/simulation/multisetting_res_ot_cor' + name_setting + '.npy', res_cor)
         res_tune = test_util.multisetting_cp_ot_cost(cost_tune, T, win_size=win_size)
-        np.save(r'..\results\simulation\multisetting_res_ot_tune' + name_setting + '.npy', res_tune)
+        np.save(r'../results/simulation/multisetting_res_ot_tune' + name_setting + '.npy', res_tune)
     elif data_type == 'ng':
         res_ot = test_util.multisetting_cp_ot_cost_ng(cost_all, T, win_size=win_size)
-        np.save(r'..\results\simulation\multisetting_res_ot_ng' + name_setting + '.npy', res_ot)
-        res_tune = test_util.multisetting_cp_ot_cost(cost_tune, T, win_size=win_size)
-        np.save(r'..\results\simulation\multisetting_res_ot_tune_ng' + name_setting + '.npy', res_tune)
+        np.save(r'../results/simulation/multisetting_res_ot_ng' + name_setting + '.npy', res_ot)
         
   
 if do_comp:
     if data_type == 'g':
         
-        res_ot = np.load(r'..\results\simulation\multisetting_res_ot' + name_setting + '.npy', allow_pickle=True)
+        res_ot = np.load(r'../results/simulation/multisetting_res_ot' + name_setting + '.npy', allow_pickle=True)
         
-        res_tune = np.load(r'..\results\simulation\multisetting_res_ot_tune' + name_setting + '.npy', allow_pickle=True)
+        res_tune = np.load(r'../results/simulation/multisetting_res_ot_tune' + name_setting + '.npy', allow_pickle=True)
         
-        # res_cor = np.load(r'..\results\simulation\multisetting_res_ot_cor' + name_setting + '.npy', allow_pickle=True)
+        # res_cor = np.load(r'../results/simulation/multisetting_res_ot_cor' + name_setting + '.npy', allow_pickle=True)
         
-        # res_mn_raw = scipy.io.loadmat(r'..\results\simulation\multisetting_res_mn.mat')['cpt']
-        res_mn_raw = scipy.io.loadmat(r'..\results\simulation\multisetting_res_mn' + ('_cor' if offset else '') + '.mat')['cpt']
+        # res_mn_raw = scipy.io.loadmat(r'../results/simulation/multisetting_res_mn.mat')['cpt']
+        res_mn_raw = scipy.io.loadmat(r'../results/simulation/multisetting_res_mn' + ('_cor' if offset else '') + '.mat')['cpt']
         res_mn = test_util.get_res_from_others(res_mn_raw, len(ns), len(nus), len(etas), M, ftype='mat')
                     
-        res_ecp_raw = np.load(r'..\results\simulation\multisetting_res_ecp' + ('_cor' if offset else '') + '.npy')
+        res_ecp_raw = np.load(r'../results/simulation/multisetting_res_ecp' + ('_cor' if offset else '') + '.npy')
         res_ecp = test_util.get_res_from_others(res_ecp_raw, len(ns), len(nus), len(etas), M, ftype='r')
                     
-        # res_wbs_raw = np.load(r'..\results\simulation\multisetting_res_wbs' + ('_cor' if offset else '') + '.npy')
+        # res_wbs_raw = np.load(r'../results/simulation/multisetting_res_wbs' + ('_cor' if offset else '') + '.npy')
         # res_wbs = test_util.get_res_from_others(res_wbs_raw, len(ns), len(nus), len(etas), M, ftype='r')
                     
         res_all = test_util.prf_table_all(res_ot, res_mn, res_ecp, ns=ns, nus=nus, etas=etas, real_cp=real_cp, index=index, win_size=win_size) 
-        res_all.to_csv(r'..\results\simulation\multisetting_res_table' + name_setting + ('_cor' if offset else '') + '.csv')
+        res_all.to_csv(r'../results/simulation/multisetting_res_table' + name_setting + '.csv')
     
-        res_all_cor = test_util.prf_table_all(res_ot, res_cor, res_mn, res_ecp, ns=ns, nus=nus, etas=etas, real_cp=real_cp, index=['OT', 'OT COR', 'MN', 'ECP'], win_size=win_size) 
-    
+        # res_all_cor = test_util.prf_table_all(res_ot, res_cor, res_mn, res_ecp, ns=ns, nus=nus, etas=etas, real_cp=real_cp, index=['OT', 'OT COR', 'MN', 'ECP'], win_size=win_size) 
+        # res_all_cor.to_csv(r'../results/simulation/multisetting_res_table' + name_setting + '_cor.csv')
+        
         res_all_tune = test_util.prf_table_all(res_ot, res_tune, res_mn, res_ecp, ns=ns, nus=nus, etas=etas, real_cp=real_cp, index=['OT', 'OTT', 'MN', 'ECP'], win_size=win_size)
+        res_all_tune.to_csv(r'../results/simulation/multisetting_res_table' + name_setting + '_tune.csv')
     
     elif data_type == 'ng':
         
         n_temp = len(pwrs) if switch else len(etas)
         temps = pwrs.copy() if switch else etas.copy()
-        res_ot = np.load(r'..\results\simulation\multisetting_res_ot_ng' + name_setting + '.npy', allow_pickle=True)
+        res_ot = np.load(r'../results/simulation/multisetting_res_ot_ng' + name_setting + '.npy', allow_pickle=True)
         
-        res_tune = np.load(r'..\results\simulation\multisetting_res_ot_tune_ng' + name_setting + '.npy', allow_pickle=True)
-        
-        res_mn_raw = scipy.io.loadmat(r'..\results\simulation\multisetting_res_mn_ng.mat')['cpt']
+        res_mn_raw = scipy.io.loadmat(r'../results/simulation/multisetting_res_mn_ng.mat')['cpt']
         res_mn = test_util.get_res_from_others_ng(res_mn_raw, len(ns), n_temp, M, ftype='mat')
         
-        res_ecp_raw = np.load(r'..\results\simulation\multisetting_res_ecp_ng.npy')
+        res_ecp_raw = np.load(r'../results/simulation/multisetting_res_ecp_ng.npy')
         res_ecp = test_util.get_res_from_others_ng(res_ecp_raw, len(ns), n_temp, M, ftype='r')
         
-        # res_wbs_raw = np.load(r'..\results\simulation\multisetting_res_wbs_ng.npy')
+        # res_wbs_raw = np.load(r'../results/simulation/multisetting_res_wbs_ng.npy')
         # res_wbs = test_util.get_res_from_others_ng(res_wbs_raw, len(ns), n_temp, M, ftype='r')
         
         res_all = test_util.prf_table_all_ng(res_ot, res_mn, res_ecp, ns=ns, etas=temps, real_cp=real_cp, switch=switch, index=index, win_size=win_size)
-        res_all.to_csv(r'..\results\simulation\multisetting_res_table_ng' + name_setting + '.csv')
+        res_all.to_csv(r'../results/simulation/multisetting_res_table_ng' + name_setting + '.csv')
 
-        res_all_tune = test_util.prf_table_all_ng(res_ot, res_tune, res_mn, res_ecp, ns=ns, etas=temps, real_cp=real_cp, switch=switch, index=['OT', 'OTT', 'MN', 'ECP'], win_size=win_size)
+        # res_all_tune = test_util.prf_table_all_ng(res_ot, res_tune, res_mn, res_ecp, ns=ns, etas=temps, real_cp=real_cp, switch=switch, index=['OT', 'OTT', 'MN', 'ECP'], win_size=win_size)
+        # res_all_tune.to_csv(r'../results/simulation/multisetting_res_table_ng' + name_setting + '_tune.csv')
 
     pd.set_option('display.max_columns', None)
     print(res_all)
