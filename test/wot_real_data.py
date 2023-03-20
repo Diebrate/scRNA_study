@@ -14,12 +14,13 @@ os.chdir('..\preproc')
 import time
 start_time = time.time()
 
-sink = True
-win_size = 3
+sink = False
+win_size = 1
 weight = None
 
-do_cost = False
-do_load = True
+do_cost = True
+do_save = False
+do_load = False
 
 reg = 0.001 # 0.05
 reg1 = 1
@@ -60,9 +61,9 @@ costm = test_util.get_cost_matrix(centroids, centroids, dim=dim)
 # costm = costm / np.median(costm)
 res_tune = solver.optimal_lambda_ts(probs, costm, reg, 0, 0.1, grid_size=50)
 reg_opt = res_tune['opt_lambda']
-reg1 = reg2 = reg_opt
-tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=reg, reg1=reg_opt, reg2=50)
-cost = solver.loss_unbalanced_all_local(probs, costm, reg, reg1, reg2, sink=sink, win_size=win_size, weight=weight, partial=True)
+# reg1 = reg2 = reg_opt
+tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=reg, reg1=reg1, reg2=50)
+cost = solver.loss_unbalanced_all_local(probs, costm, reg, reg1, reg2=50, sink=sink, win_size=win_size, weight=weight, partial=True)
 
 ### normalization
 # cost = cost / np.sum(cost)
@@ -72,7 +73,8 @@ cost = solver.loss_unbalanced_all_local(probs, costm, reg, reg1, reg2, sink=sink
 
 if do_cost:
     local_cost_disc = solver.compute_cost_disc(probs, costm, reg, reg1, reg2, sink=sink, partial=True, max_win_size=4)
-    np.save(r'..\results\cost_local_disc_wot.npy', local_cost_disc)
+    if do_save:
+        np.save(r'..\results\cost_local_disc_wot.npy', local_cost_disc)
 
 if do_load:
     local_cost_disc = np.load(r'..\results\cost_local_disc_wot.npy')
@@ -83,7 +85,7 @@ cp_days = []
 
 ### normalizing the cost
 for i in range(4):
-    cost_disc_m[i] = cost_disc_m[i] / np.sum(cost_disc_m[i])
+    # cost_disc_m[i] = cost_disc_m[i] / np.sum(cost_disc_m[i])
     cp.append(test_util.get_cp_from_cost(cost_disc_m[i], win_size=i + 1))
     cp_days.append(time_names[cp[i]])
 
@@ -91,20 +93,20 @@ x = list(range(T - 1))
 # z = np.polyfit(x, [float(i) for i in cost], 7)
 # f = np.poly1d(z)
 
-graph_cost0 = False
+graph_cost0 = True
 
 if graph_cost0:
 
     fig, ax = plt.subplots(figsize=(10,8))
 
-    ax.plot(x, cost_disc_m[1])
+    ax.plot(x, cost_disc_m[win_size - 1])
     ax.set_xticks(x)
     ax.set_xticklabels(time_names[:-1], rotation=70, size=10)
     ax.set_xlabel('Time', size=20)
     ax.set_ylabel('Loss', size=20)
     ax.set_title(r'Time vs Loss with PHATE Embedding', size = 20)
     plt.legend()
-    plt.savefig(r'..\image\wot_res')
+    # plt.savefig(r'..\image\wot_res')
 
 graph_cost = False
 
@@ -124,7 +126,7 @@ if graph_cost:
     ax.set_ylabel('Loss', size=20)
     ax.set_title(r'Time vs Loss with PHATE Embedding', size = 20)
     plt.legend()
-    plt.savefig(r'..\image\wot_res_all')
+    # plt.savefig(r'..\image\wot_res_all')
 
 graph_tmap = False
 
@@ -138,9 +140,9 @@ if graph_tmap:
         ax.set_xticklabels(np.insert(type_list, 0, ''), rotation=20)
         ax.set_yticklabels(np.insert(type_list, 0, ''))
         reform_time_name = time_names[i].replace('.', '_') + 'to' + time_names[i+1].replace('.', '_')
-        plt.savefig(r'..\image\wot_tmap\transport_map_'+reform_time_name)
+        # plt.savefig(r'..\image\wot_tmap\transport_map_'+reform_time_name)
 
-graph_all = False
+graph_all = True
 
 if graph_all:
     fig, axs = plt.subplots(9, 4, figsize=(36, 85))
@@ -158,5 +160,7 @@ if graph_all:
     cbar.set_label('probability')
     plt.tight_layout(rect=[0, 0.1, 1, 1])
     # plt.savefig(r'../image/tmap_all.png')
+
+print(cp_days)
 
 print("--- %s seconds ---" % (time.time() - start_time))

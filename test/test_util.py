@@ -64,7 +64,7 @@ def get_offdiag(M):
     M = np.array(M)
     k = np.array(M).shape[0]
     mask = np.diag(np.ones(k, dtype=bool)) == False
-    return M[mask]  
+    return M[mask]
 
 
 def ot_map_test(x, y, M, k, reg=1):
@@ -199,8 +199,8 @@ def perm_test1(x1, x2, costm, reg, k=None, n_sim=1000, fullreturn=False):
         return pval
     else:
         return {'zs': zs, 'pval': pval}
-    
-    
+
+
 def perm_test1_unbalanced(x1, x2, costm, reg, reg1, reg2, k=None, n_sim=1000, fullreturn=False):
     N = len(x1)
     if k is None:
@@ -230,8 +230,8 @@ def perm_test1_unbalanced(x1, x2, costm, reg, reg1, reg2, k=None, n_sim=1000, fu
         return pval
     else:
         return {'zs': zs, 'pval': pval}
-    
-    
+
+
 def perm_test_balanced_fast(x1, x2, costm, reg, k=None, sink=True, n_sim=1000, fullreturn=False):
     N = len(x1)
     if k is None:
@@ -269,8 +269,8 @@ def perm_test_balanced_fast(x1, x2, costm, reg, k=None, sink=True, n_sim=1000, f
         return pval
     else:
         return {'zs': zs, 'pval': pval}
-    
-    
+
+
 def perm_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, sink=True, n_sim=1000, fullreturn=False, n_conv=None):
     N = len(x1)
     if k is None:
@@ -335,8 +335,8 @@ def perm_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, sink=True,
         return pval
     else:
         return {'zs': zs, 'pval': pval}
-    
-    
+
+
 def boot_test_balanced_fast(x1, x2, costm, reg, k=None, sink=True, n_sim=1000, fullreturn=False):
     N = len(x1)
     M = len(x2)
@@ -368,7 +368,7 @@ def boot_test_balanced_fast(x1, x2, costm, reg, k=None, sink=True, n_sim=1000, f
         p_kde.fit()
         cdf = np.copy(p_kde.cdf)
         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
-        pval = decimal_trunc(1 - cdf[-1], 10)  
+        pval = decimal_trunc(1 - cdf[-1], 10)
     # pval = np.min([np.mean(zs >= z), np.mean(zs <= z)])
     # if pval == 0 or pval == 1:
     #     p_kde = sm.nonparametric.KDEUnivariate(zs)
@@ -380,8 +380,8 @@ def boot_test_balanced_fast(x1, x2, costm, reg, k=None, sink=True, n_sim=1000, f
         return pval
     else:
         return {'zs': zs, 'pval': pval}
-    
-    
+
+
 def boot_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, sink=True, n_sim=1000, fullreturn=False, n_conv=None, scale=5):
     N = len(x1)
     M = len(x2)
@@ -434,7 +434,7 @@ def boot_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, sink=True,
         p_kde.fit()
         cdf = np.copy(p_kde.cdf)
         cdf = cdf[np.all(np.vstack((cdf!=0, cdf!=1)), axis=0)]
-        pval = decimal_trunc(1 - cdf[-1], 10)  
+        pval = decimal_trunc(1 - cdf[-1], 10)
     # pval = np.min([np.mean(zs >= z), np.mean(zs <= z)])
     # if pval == 0 or pval == 1:
     #     p_kde = sm.nonparametric.KDEUnivariate(zs)
@@ -446,8 +446,8 @@ def boot_test_unbalanced_fast(x1, x2, costm, reg, reg1, reg2, k=None, sink=True,
         return pval
     else:
         return {'zs': zs, 'pval': pval}
-    
-    
+
+
 def power_test_unbalanced_fast(p, g, B, costm, reg, reg1, reg2, k, sink=True, n_sim=1000, n_sample=1000):
     p1 = p
     p2 = p1 * g / np.sum(p1 * g)
@@ -525,7 +525,7 @@ def est_check_unbalanced_fast(x1, x2, p1, g, B, costm, reg, reg1, reg2, k, n_con
     names = list(est_res.keys())
     for name in names:
         df = {'value': np.concatenate((est_res[name], real_res[name])),
-              'source': np.concatenate((np.repeat('est', n_sim), np.repeat('real', n_sample)))} 
+              'source': np.concatenate((np.repeat('est', n_sim), np.repeat('real', n_sample)))}
         plt.figure()
         sns.kdeplot(data=df, x='value', hue='source', common_norm=False, alpha=.5, fill=True).set_title(name)
     def dict_concat(d):
@@ -547,7 +547,7 @@ def est_check_unbalanced_fast(x1, x2, p1, g, B, costm, reg, reg1, reg2, k, n_con
 def offset_growth(prob_all, costm, reg, reg1, conv=True):
     prob_bef = prob_all[:-1, ].T
     prob_aft = prob_all[1:, ].T
-    gs = 1 + solver.estimate_growth1(prob_bef, prob_aft, costm, reg, reg1, 50, single=False, conv=conv)    
+    gs = 1 + solver.estimate_growth1(prob_bef, prob_aft, costm, reg, reg1, 50, single=False, conv=conv)
     def backward(g, p):
         p0 = np.array(p / g)
         return p0 / np.sum(p0)
@@ -570,8 +570,8 @@ def offset_growth_mc(prob_all_mc, costm, reg, reg1, conv=True):
     for m in range(M):
         res.append(offset_growth(prob_all_mc[m], costm, reg, reg1, conv=conv))
     return np.array(res)
-            
-    
+
+
 def growth_CI1(x1, x2, costm, reg, reg1, reg2, k=None, ignore_empty=True, n_sim=1000, conv=False):
     N = len(x1)
     M = len(x2)
@@ -608,13 +608,13 @@ def growth_CI1(x1, x2, costm, reg, reg1, reg2, k=None, ignore_empty=True, n_sim=
     zs = solver.estimate_growth1(d1, d2, costm, reg, reg1, reg2, single=False, conv=conv)
     zs = np.array(zs)
     if ignore_empty:
-        return {'est': z, 
-                '2.5%': np.percentile(zs, 2.5, axis=0), 
+        return {'est': z,
+                '2.5%': np.percentile(zs, 2.5, axis=0),
                 '97.5%': np.percentile(zs, 97.5, axis=0),
                 'sim': zs}
     else:
-        return {'est': z, 
-                '2.5%': np.percentile(zs, 2.5, axis=0), 
+        return {'est': z,
+                '2.5%': np.percentile(zs, 2.5, axis=0),
                 '97.5%': np.percentile(zs, 97.5, axis=0),
                 'sim': zs,
                 'valid_group1': label1,
@@ -657,13 +657,13 @@ def growth_CI2(x1, x2, costm, reg, reg1, reg2, k=None, ignore_empty=True, n_sim=
     zs = solver.estimate_growth2(d1, d2, costm, reg, reg1, reg2, single=False, conv=conv)
     zs = np.array(zs)
     if ignore_empty:
-        return {'est': z, 
-                '2.5%': np.percentile(zs, 2.5, axis=0), 
+        return {'est': z,
+                '2.5%': np.percentile(zs, 2.5, axis=0),
                 '97.5%': np.percentile(zs, 97.5, axis=0),
                 'sim': zs}
     else:
-        return {'est': z, 
-                '2.5%': np.percentile(zs, 2.5, axis=0), 
+        return {'est': z,
+                '2.5%': np.percentile(zs, 2.5, axis=0),
                 '97.5%': np.percentile(zs, 97.5, axis=0),
                 'sim': zs,
                 'valid_group1': label1,
@@ -744,8 +744,8 @@ def run_cusum_ot(data, k, costm, reg=1, reg1=1, reg2=1, balanced=True, sink=True
         return res, cost
     else:
         return res
-    
-    
+
+
 def run_cusum(data, k, return_ll=False):
     def get_count(x, k):
         count = np.zeros(k)
@@ -779,9 +779,9 @@ def run_cusum(data, k, return_ll=False):
     if return_ll:
         return cp, st, gt, diff
     else:
-        return cp    
-    
-    
+        return cp
+
+
 def cp_detection_ot(data, k, costm, reg=1, reg1=1, reg2=1, return_cost=True, **kwargs):
     cost = run_cusum_ot(data, k, costm, reg, reg1, reg2, full_return=True, **kwargs)[1]
     # sort_ind = np.argsort(cost)[::-1]
@@ -812,8 +812,8 @@ def cp_detection_ot(data, k, costm, reg=1, reg1=1, reg2=1, return_cost=True, **k
         return cp, cost
     else:
         return cp
-    
-    
+
+
 def ot_loglik_unbalanced(x1, x2, k, costm, reg, reg1, reg2, n_conv=7):
     p1 = get_weight(x1, k)
     p2 = get_weight(x2, k)
@@ -834,7 +834,7 @@ def ot_loglik_unbalanced(x1, x2, k, costm, reg, reg1, reg2, n_conv=7):
         loglik_alt += data[i] * np.log(p2[i])
         loglik_sim = loglik_sim + data[i] * np.log(p2_sim[i])
     return loglik_null, loglik_alt, loglik_sim
-        
+
 
 def cp_detection_mc(data, k, costm, reg=1, reg1=1, reg2=1, balanced=True, sink=True, n_sim=1000, track_iter=True, order=None):
     # change point detection designed for monte carlo data
@@ -902,7 +902,7 @@ def get_cp_from_cost(cost, win_size=None):
         res = np.array(res)
         # res = res[res >= win_size - 1]
         # return res[res < l - win_size]
-        return res + win_size - 1 
+        return res + win_size - 1
     else:
         est = KMeans(n_clusters=2).fit_predict(cost.reshape((-1, 1)))
         ind = est[np.argmax(cost)]
@@ -1168,8 +1168,8 @@ def check_unbalanced_tmap_conv(p1, p2, d, costm, reg, reg1, reg2, n_size, n_sim,
     for i in range(n_sim):
         p1_sim[i, ] = np.random.multinomial(n_size, p1) / n_size
         p2_sim[i, ] = np.random.multinomial(n_size, p2) / n_size
-    if tune:
-        reg_opt = solver.optimal_lambda_ts(probs_all[coord][m], costm, reg, grid_min, grid_max)['opt_lambda']
+    # if tune:
+    #     reg_opt = solver.optimal_lambda_ts(probs_all[coord][m], costm, reg, grid_min=0, grid_max=1)['opt_lambda']
     tmap_sim = solver.ot_unbalanced_all(p1_sim.T, p2_sim.T, costm, reg, reg1, reg2)
     tmap_real = solver.ot_unbalanced(p1, p2, costm, reg, reg1, reg2)
     diff_sim = tmap_compare_mc(tmap_sim, tmap_real)
@@ -1199,7 +1199,7 @@ def dgp_from_prob(prob, n, T, d, M):
             data_temp[t, ] = np.random.choice(np.arange(d), size=n, p=prob[t, ])
         data_mc.append(data_temp)
     return np.array(data_mc)
-    
+
 
 def dgp_with_prob(prob, n, matformat=True):
     # rescaling of probability vectors
@@ -1246,7 +1246,7 @@ def dgp(nu, eta, cp, g, d, T, n, M):
         if t - 1 in cp:
             # p[t, ] = np.repeat(1 / d, d)
             p[t, ] = B.T @ p[t, ]
-    data_mc = []        
+    data_mc = []
     for m in range(M):
         data_temp = np.zeros((T + 1, n), dtype=int)
         for t in range(T + 1):
@@ -1280,7 +1280,7 @@ def dgp_no_trans(nu, eta, cp, g, d, T, n, M):
                         p[t, d_temp] *= np.exp(eta)
             p[t, ] = p[t, ] / np.sum(p[t, ])
             state += 1
-    data_mc = []        
+    data_mc = []
     for m in range(M):
         data_temp = np.zeros((T + 1, n), dtype=int)
         for t in range(T + 1):
@@ -1325,7 +1325,7 @@ def dgp_ng(eta, cp, d, T, n, M):
             # p[t, ] = np.repeat(1 / d, d)
             p[t, ] = B.T @ p[t, ]
             state += 1
-    data_mc = []        
+    data_mc = []
     for m in range(M):
         data_temp = np.zeros((T + 1, n), dtype=int)
         for t in range(T + 1):
@@ -1358,7 +1358,7 @@ def dgp_ng_no_trans(eta, cp, d, T, n, M):
                         p[t, d_temp] *= np.exp(eta)
             p[t, ] = p[t, ] / np.sum(p[t, ])
             state += 1
-    data_mc = []        
+    data_mc = []
     for m in range(M):
         data_temp = np.zeros((T + 1, n), dtype=int)
         for t in range(T + 1):
@@ -1368,7 +1368,7 @@ def dgp_ng_no_trans(eta, cp, d, T, n, M):
 
 
 def dgp_ng_switch(pwr, cp, d, T, n, M):
-    data_mc = []  
+    data_mc = []
     theta = 0
     for m in range(M):
         data_temp = np.zeros((T + 1, n), dtype=int)
@@ -1614,8 +1614,8 @@ def sample_path(x, y_all, tmap_all, n_sim, plot=False):
 #                 res_nu0.append(sum_table(ot_temp, cs_temp, real_cp=real_cp, index=['OT', 'CS']))
 #             res_n0['nu=' + str(nu)] = pd.concat(res_nu0, axis='columns', keys=['eta=' + str(e) for e in etas])
 #         res_total['n=' + str(n)] = pd.concat(res_n0)
-#     res_total = pd.concat(res_total)    
-#     return res_total    
+#     res_total = pd.concat(res_total)
+#     return res_total
 
 
 def sim_costm(d, low_close, high_close, low_far, high_far):
@@ -1638,7 +1638,7 @@ def sim_costm(d, low_close, high_close, low_far, high_far):
                     costm[j, i] = costm[i, j]
         np.fill_diagonal(costm, 0)
     return costm
-                
+
 
 def constant_costm(d, low, high):
     costm = np.zeros((d, d))
@@ -1672,17 +1672,17 @@ def simulate(k, p_start, p_trans, size=1000):
 
 def simulate2d(p_start, p_trans, mean, var, size=1000):
     '''return simulated 2D data with noise
-    
-    
+
+
     centroids = [[1, 1], [1, -1], [-1, 1], [-1, -1]]
-    
-    
+
+
     Parameters:
         p_start: starting probability
         p_trans: transitional probability matrix
         var: noise level (covariance matrix)
-        
-        
+
+
     '''
     def get_label(x, centroids):
         dist = spatial.distance.cdist(x, centroids)
@@ -1704,7 +1704,7 @@ def simulate2d(p_start, p_trans, mean, var, size=1000):
 
 
 class ot_hierarchy_sample:
-    
+
     def __init__(self, ):
         self.data = []
         self.probs = []
@@ -1722,7 +1722,7 @@ class ot_hierarchy_sample:
         for i in range(4):
             d = self.probs[i].size
             self.dgp(np.arange(i, i + d), probs=self.probs[i])
-        
+
     def dgp(self, sub_index, size=1000, probs=None, index=None, copy=False):
         d = len(sub_index)
         if probs is None:
@@ -1738,14 +1738,14 @@ class ot_hierarchy_sample:
                 self.data.append((x, y))
             else:
                 self.data[index] = (x, y)
-        
+
     def plot(self, *index):
         for i in range(len(index)):
             plt.figure()
             scatter = plt.scatter(self.data[index[i]][0][:, 0], self.data[index[i]][0][:, 1], c=self.data[index[i]][1], s=0.5)
             plt.legend(*scatter.legend_elements(), title="Clusters")
             plt.title('data set ' + str(index[i]))
-                      
+
     def compute_ot_hier(self, reg, reg1, reg2, index1=None, index2=None, **kwargs):
         if len(index1) == 1:
             x1, y1 = self.data[index1]
@@ -1759,8 +1759,8 @@ class ot_hierarchy_sample:
         res_bb = solver.hierarchical_ot(x2, x2, y2, y2, reg, reg1, reg2, **kwargs)
         res_ab = solver.hierarchical_ot(x1, x2, y1, y2, reg, reg1, reg2, **kwargs)
         return {'res': [res_ab, res_aa, res_bb],
-                'loss': res_ab[1] - 0.5 * (res_aa[1] + res_bb[1])}    
-    
+                'loss': res_ab[1] - 0.5 * (res_aa[1] + res_bb[1])}
+
     def compare_runtime(self, list_n, probs_ind1, probs_ind2, reg, reg1, reg2, bal_out=True, bal_in=True, plot=True):
         p1 = self.probs[probs_ind1]
         p2 = self.probs[probs_ind2]
@@ -1790,7 +1790,7 @@ class ot_hierarchy_sample:
                 't': t,
                 'res_h': res_h,
                 'res': res}
-    
+
     def compare_runtime_minibatch(self, list_n, batch_frac, batch_num, probs_ind1, probs_ind2, reg, reg1, reg2, bal_out=True, bal_in=True, plot=True):
         p1 = self.probs[probs_ind1]
         p2 = self.probs[probs_ind2]
@@ -1829,7 +1829,7 @@ class ot_hierarchy_sample:
                 't': t,
                 'res_h': res_h,
                 'res': res}
-    
+
     def test_cp_detection(self, T, t_cp, reg, reg1, reg2, size=1000, prob1=None, prob2=None):
         if prob1 is None:
             prob1 = np.ones(10) / 10
@@ -1849,10 +1849,10 @@ class ot_hierarchy_sample:
         for t in range(T):
             res.append(self.compute_ot_hier(reg, reg1, reg2, index1=data[t], index2=data[t + 1]))
         return res
-        
+
 
 class ot_classifier:
-    
+
     def __init__(self, data, n_cluster, reg, reg1, reg2):
         ### non-default parameters
         self.data = data
@@ -1887,14 +1887,14 @@ class ot_classifier:
         self.labels_record.append(labels)
         counts = np.unique(self.labels, return_counts=True)[1]
         self.pk = counts / counts.sum()
-            
+
     def run_classifier(self, n_iter=5):
         for i in range(n_iter):
             self.compute_label()
             for k in range(self.n_cluster):
                 self.centroids[k] = np.mean(self.data[self.labels == k, :], axis=0)
             self.costm = solver.compute_dist(self.data, self.centroids, dim=self.dim, single=False)
-            
+
     def plot(self):
         n_iter = len(self.labels_record)
         for i in range(n_iter):
@@ -1903,9 +1903,9 @@ class ot_classifier:
             plt.legend(*scatter.legend_elements(), title="Clusters")
             plt.title('iteration ' + str(i + 1))
 
-        
+
 class sim_data:
-    
+
     def __init__(self):
         ### default parameters:
         self.centroids = np.array([[1, 1],
@@ -1914,10 +1914,10 @@ class sim_data:
                                    [-1, -1]])
         self.n_cluster, self.dim = self.centroids.shape
         self.cov = np.identity(self.dim) * 0.25
-            
+
     def set_cov(self, cov):
         self.cov = cov
-            
+
     def generate_sample(self, size, weight):
         self.p = weight
         self.labels = np.random.choice(np.arange(self.n_cluster), size=size, p=weight)
@@ -1934,7 +1934,7 @@ class sim_data_gt:
         self.set_d(d0, d1, d2)
         if t_list is not None:
             self.sample_multi_t(t_list, n, plot=plot, **kwargs)
-            
+
     def set_d(self, d0, d1, d2):
         self.d0_y = self.get_dy(d0)
         self.d1_y = self.get_dy(d1)
@@ -1942,14 +1942,14 @@ class sim_data_gt:
         self.d0 = d0
         self.d1 = d1
         self.d2 = d2
-        
+
     def get_dy(self, d):
         if d % 2 == 0:
             dy = np.arange(d) * 10 + (-5 * d + 5)
         else:
             dy = np.arange(d) * 10 + (-10 * (d // 2))
         return dy
-            
+
     def sample_at_t(self, t, n, v=None):
         data = np.zeros((n, 2))
         n_start = np.random.binomial(n, 1 - t if t < 1 else 2 - t)
@@ -1961,7 +1961,7 @@ class sim_data_gt:
             d_end = self.d1
             dy_end = self.d1_y
         else:
-            x = 10 * self.d2 * (t - 1)  
+            x = 10 * self.d2 * (t - 1)
             d_start = self.d1
             dy_start = self.d1_y
             d_end = self.d2
@@ -1981,7 +1981,7 @@ class sim_data_gt:
             data[i] = np.random.multivariate_normal(mean=[x, dy_end[label_end[i - n_start]]],
                                                     cov=cov)
         return data
-    
+
     def sample_at_t_ring(self, t, n, r_loc=1, r_scale=0.25, h=0.1, gamma=0.1):
         if t == 0 or t == 1:
             gamma = 0
@@ -2000,8 +2000,8 @@ class sim_data_gt:
         for j in range(n_ring, n):
             sample[j, 0] = np.random.uniform(x_low, x_high)
             sample[j, 1] = np.random.uniform(y_low, y_high)
-        return sample           
-    
+        return sample
+
     def sample_multi_t(self, t_list, n, method='2d', plot=False, **kwargs):
         if method == '2d':
             sample_method = self.sample_at_t
@@ -2018,46 +2018,47 @@ class sim_data_gt:
         self.data=data
         if plot:
             self.plot_data()
-    
-    def update_cost_payoff_tmap_balanced(self, h, reg, eta, plot_sample=False):
-        T = len(self.t_list) - 1
-        self.cost = []
-        self.payoff = []
-        data = [self.data.loc[self.data.t == t, ['x', 'y']].to_numpy() for t in t_list]
-        for t in range(T):
-            x1 = data[t]
-            x2 = data[t + 1]
-            # self.cost.append(solver.compute_dist(x1, x2, dim=2, single=False))
-            self.cost.append(0.5 * (solver.compute_dist(x1, x2, dim=2, single=False) ** 2))
-        self.payoff = compute_payoff_all_t(data, h)
-        self.tmap = compute_otgt_balanced_all_t(data, self.payoff, reg, eta, n_iter=10000)
-        if plot_sample:
-            self.plot_sample_path()
-            
-    def update_cost_payoff_tmap_unbalanced(self, h, reg, reg1, reg2, eta, plot_sample=False):
-        T = len(self.t_list) - 1
-        self.cost = []
-        self.payoff = []
-        data = [self.data.loc[self.data.t == t, ['x', 'y']].to_numpy() for t in t_list]
-        for t in range(T):
-            x1 = data[t]
-            x2 = data[t + 1]
-            # self.cost.append(solver.compute_dist(x1, x2, dim=2, single=False))
-            self.cost.append(0.5 * (solver.compute_dist(x1, x2, dim=2, single=False) ** 2))
-        self.payoff = compute_payoff_all_t(data, h)
-        self.tmap = compute_otgt_unbalanced_all_t(data, self.payoff, reg, reg1, reg2, eta, n_iter=10000)
-        if plot_sample:
-            self.plot_sample_path() 
-   
-    def plot_data(self):
-        plt.figure(figsize=(10, 8))
-        sns.scatterplot(data=self.data, x='x', y='y', hue='t', s=4, palette=sns.color_palette('viridis',len(self.t_list)), edgecolor='none')
-        plt.legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
-     
-    def plot_sample_path(self):
-        data = [self.data.loc[self.data.t == t, ['x', 'y']].to_numpy() for t in t_list]
-        sample_path(data[0], data[1:], self.tmap, n_sim=50, plot=True)
-            
+
+    # def update_cost_payoff_tmap_balanced(self, h, reg, eta, plot_sample=False):
+    #     T = len(self.t_list) - 1
+    #     self.cost = []
+    #     self.payoff = []
+    #     data = [self.data.loc[self.data.t == t, ['x', 'y']].to_numpy() for t in t_list]
+    #     for t in range(T):
+    #         x1 = data[t]
+    #         x2 = data[t + 1]
+    #         # self.cost.append(solver.compute_dist(x1, x2, dim=2, single=False))
+    #         self.cost.append(0.5 * (solver.compute_dist(x1, x2, dim=2, single=False) ** 2))
+    #     self.payoff = compute_payoff_all_t(data, h)
+    #     self.tmap = compute_otgt_balanced_all_t(data, self.payoff, reg, eta, n_iter=10000)
+    #     if plot_sample:
+    #         self.plot_sample_path()
+
+    # def update_cost_payoff_tmap_unbalanced(self, h, reg, reg1, reg2, eta, plot_sample=False):
+    #     T = len(self.t_list) - 1
+    #     self.cost = []
+    #     self.payoff = []
+    #     # data = [self.data.loc[self.data.t == t, ['x', 'y']].to_numpy() for t in t_list]
+    #     for t in range(T):
+    #         x1 = data[t]
+    #         x2 = data[t + 1]
+    #         # self.cost.append(solver.compute_dist(x1, x2, dim=2, single=False))
+    #         self.cost.append(0.5 * (solver.compute_dist(x1, x2, dim=2, single=False) ** 2))
+    #     self.payoff = compute_payoff_all_t(data, h)
+    #     self.tmap = compute_otgt_unbalanced_all_t(data, self.payoff, reg, reg1, reg2, eta, n_iter=10000)
+    #     if plot_sample:
+    #         self.plot_sample_path()
+
+    # def plot_data(self):
+    #     plt.figure(figsize=(10, 8))
+    #     sns.scatterplot(data=self.data, x='x', y='y', hue='t', s=4, palette=sns.color_palette('viridis',len(self.t_list)), edgecolor='none')
+    #     plt.legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
+
+    # def plot_sample_path(self):
+    #     # data = [self.data.loc[self.data.t == t, ['x', 'y']].to_numpy() for t in t_list]
+    #     # sample_path(data[0], data[1:], self.tmap, n_sim=50, plot=True)
+    #     pass
+
 
 # OT classifier test
 ##################################################
@@ -2079,7 +2080,7 @@ class sim_data_gt:
 # # otgt.update_cost_payoff_tmap_unbalanced(h=10, reg=10, reg1=0, reg2=1, eta=0.5, plot_sample=True)
 # t_list = np.linspace(0, 1, 5)
 # otgt = sim_data_gt(t_list=t_list, n=1000, plot=True, method='ring', r_loc=5, r_scale=0.5, h=0.15, gamma=0.15)
-# otgt.update_cost_payoff_tmap_unbalanced(h=0.1, reg=10, reg1=0, reg2=0.001, eta=1, plot_sample=True)           
+# otgt.update_cost_payoff_tmap_unbalanced(h=0.1, reg=10, reg1=0, reg2=0.001, eta=1, plot_sample=True)
 
 
 # test data
@@ -2115,7 +2116,7 @@ class sim_data_gt:
 # x = np.array(x, dtype=int)
 # y = np.array(y, dtype=int)
 
-# costm = np.random.rand(k, k) 
+# costm = np.random.rand(k, k)
 # costm = costm @ costm.transpose()
 # np.fill_diagonal(costm, 0)
 # reg = 1
@@ -2144,21 +2145,3 @@ class sim_data_gt:
 #                                 np.repeat('boot', zs.shape[0])))
 # sns.kdeplot(data=df, x='value', hue='source', common_norm=False)
 ##################################################
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
