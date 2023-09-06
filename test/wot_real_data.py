@@ -220,7 +220,7 @@ if graph_tmap_hist:
         fig.suptitle('Transport map from ' + time_names[i] + ' to ' + time_names[i+1])
 
         reform_time_name = time_names[i].replace('.', '_') + 'to' + time_names[i+1].replace('.', '_')
-        # plt.savefig(r'..\image\wot_tmap\transport_map_hist_'+reform_time_name)
+        # plt.savefig(r'..\image\wot_tmap\transport_map_hist_'+reform_time_name, bbox_inches='tight')
 
 graph_all = False
 
