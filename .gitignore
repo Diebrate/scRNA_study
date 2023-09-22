@@ -12,3 +12,4 @@ data/proc_data/proc_df_full_no_seurat.h5ad
 __pycache__/
 .idea/
 test/__pycache__/
+*.pyc
