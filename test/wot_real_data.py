@@ -167,8 +167,10 @@ if graph_tmap_hist:
         cbar.ax.set_position([0.08, 0.15, 0.65, 0.02])
 
         # Show all ticks and label them with the respective list entries.
-        axs[1, 0].set_xticks(np.arange(k), labels=type_list)
-        axs[1, 0].set_yticks(np.arange(k), labels=type_list)
+        axs[1, 0].set_xticks(np.arange(k))
+        axs[1, 0].set_xticklabels(type_list)
+        axs[1, 0].set_yticks(np.arange(k))
+        axs[1, 0].set_yticklabels(type_list)
 
         # Rotate the tick labels and set their alignment.
         plt.setp(axs[1, 0].get_xticklabels(), rotation=-30, ha="right", rotation_mode="anchor")
