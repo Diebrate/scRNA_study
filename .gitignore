@@ -14,3 +14,4 @@ __pycache__/
 test/__pycache__/
 *.pyc
 r_df.csv
+*.gmt

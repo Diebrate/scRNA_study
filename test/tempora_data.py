@@ -70,4 +70,7 @@ df['cell type'].fillna('MEF', inplace=True)
 df = df[df['day'] != 8.25]
 df = df[df['day'] != 8.75]
 
-df.to_csv(r'../data/proc_data/r_df.csv')
+df['cell type'] = df['cell type'].astype('category')
+df['type numeric'] = df['cell type'].cat.codes
+
+# df.to_csv(r'../data/proc_data/r_df.csv')
