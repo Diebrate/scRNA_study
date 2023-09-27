@@ -13,3 +13,4 @@ __pycache__/
 .idea/
 test/__pycache__/
 *.pyc
+r_df.csv
