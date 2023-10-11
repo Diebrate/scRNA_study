@@ -30,14 +30,16 @@ close(tc)
 
 #get the gmt that has all the pathways and does not include terms inferred from electronic annotations(IEA)
 #start with gmt file that has pathways only
-rx <- gregexpr("(?<=<a href=\")(.*.GOBP_AllPathways_no_GO_iea.*.)(.gmt)(?=\">)", contents, perl = TRUE)
+# rx <- gregexpr("(?<=<a href=\")(.*.GOBP_AllPathways_no_GO_iea.*.)(.gmt)(?=\">)", contents, perl = TRUE)
 
-gmt_file <- unlist(regmatches(contents, rx))
+# gmt_file <- unlist(regmatches(contents, rx))
 # dest_gmt_file <- file.path(getwd(),gmt_file )
 # download.file(
 #     paste(gmt_url,gmt_file,sep=""),
 #     destfile=dest_gmt_file
 # )
+gmt_file <- 'Mouse_GOBP_AllPathways_no_GO_iea.gmt'
+
 tempora_obj <- CalculatePWProfiles(tempora_obj, gmt_path=gmt_file, method='gsva',
                                    min.sz=5, max.sz=200, parallel.sz=1)
 
