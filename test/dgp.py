@@ -60,3 +60,5 @@ Y_phate = phate_op.fit_transform(data[['x' + str(i + 1) for i in range(G)]])
 
 data[['phate1', 'phate2']] = Y_phate
 data['time'] = np.repeat(np.arange(T + 1), n)
+
+data.to_csv('../data/simulation_data/simulation_id' + str(m) + '.csv')
