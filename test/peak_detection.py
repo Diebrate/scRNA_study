@@ -130,7 +130,7 @@ def peaks_position(vec, ridges, cwt2d, wnd=2):
             # print col, row, cols_start, cols_end
             if cols_end > cols_start:
                 inds = range(cols_start, cols_end)
-                peaks.append(inds[np.argmax(vec[inds])])
+                peaks.append(inds[np.argmax(vec[cols_start:cols_end])])
                 ridges_select.append(ridge)
         elif ridge.shape[1] > 2: # local wavelet coefficients < 0
             cols_accurate = ridge[1, 0:int(ridge.shape[1] / 2)]
@@ -150,7 +150,7 @@ def peaks_position(vec, ridges, cwt2d, wnd=2):
         ridge = ridges_select[inds[np.argmax(ridges_len[inds])]]
         inds = np.clip(range(peak - wnd, peak + wnd + 1), 0, len(vec) - 1)
         inds = np.delete(inds, np.where(inds == peak))
-        if np.all(vec[peak] > vec[inds]):
+        if np.all(vec[peak] > np.array(vec)[inds]):
             ridges_refine.append(ridge)
             peaks_refine.append(peak)
     return peaks_refine, ridges_refine
