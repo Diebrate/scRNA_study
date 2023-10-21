@@ -41,4 +41,4 @@ for k in range(B):
     # import matplotlib.pyplot as plt
     # plt.plot(cost)
 
-np.save('../results/simulation/res_cp_id' + str(m) + '.csv', res)
+np.save('../results/simulation/res_cp_id' + str(m), res)
