@@ -6,6 +6,7 @@ import solver
 
 import time
 start_time = time.time()
+print(1)
 
 np.random.seed(1030)
 

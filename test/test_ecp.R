@@ -1,5 +1,4 @@
 library(ecp)
-library(reticulate)
 library(dplyr)
 
 res <- list()
