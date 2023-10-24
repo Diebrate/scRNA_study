@@ -4,9 +4,11 @@ library(dplyr)
 res <- list()
 
 args <- commandArgs(trailingOnly = TRUE)
-m = as.integer(args[1])
+m <- as.integer(args[1])
 
 B <- 50
+
+print(paste0('working on batch ', as.character(m)))
 
 for(b in 0:(B-1)){
   dataX <- read.csv(paste0('../data/simulation_data/simulation_id', as.character(m), '_', as.character(b), '.csv'))
@@ -32,6 +34,7 @@ for(b in 0:(B-1)){
     cp[res_temp-2] <- 1
   }
   res <- append(res, list(cp))
+  print(paste0('working on batch ', as.character(m), 'iteration ', as.character(b)))
 }
 
 res <- do.call(rbind, res)
