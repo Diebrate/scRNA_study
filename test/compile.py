@@ -14,14 +14,10 @@ res_ot = []
 res_ecp = []
 res_mn = []
 
-for m in range(M):
-    res0_ot = np.load('../results/simulation/compile/res_cp_id1.npy', allow_pickle=True)
-    tmp = np.zeros((B, T))
-    for b in range(B):
-        tmp[b, [res0_ot[b] - 1]] = 1
-    res_ot.append(tmp)
-    res_ecp.append(np.array(pyreadr.read_r('../results/simulation/compile/test_ecp_id1.RDS')[None]))
-    res_mn.append(loadmat('../results/simulation/compile/test_mn_id1.mat')['res'])
+for m in range(1, M + 1):
+    res_ot.append(np.load('../results/simulation/compile/res_cp_id' + str(m) + '.npy', allow_pickle=True))
+    res_ecp.append(np.array(pyreadr.read_r('../results/simulation/compile/test_ecp_id' + str(m) + '.RDS')[None]))
+    res_mn.append(loadmat('../results/simulation/compile/test_mn_id' + str(m) + '.mat')['res'])
 
 res = {'ot': np.vstack(res_ot),
        'ecp': np.vstack(res_ecp),
@@ -32,10 +28,9 @@ perf = {method: {'precision': 0, 'recall': 0, 'f-score': 0} for method in res.ke
 
 def precision(method):
     pred = res[method]
-    if np.sum(pred) > 0:
-        return (pred @ cp) / np.sum(pred)
-    else:
-        return 0
+    x = (pred @ cp) / np.sum(pred, axis=1)
+    x[np.sum(pred, axis=1) == 0] = 0
+    return x
 
 
 def recall(method):
@@ -46,7 +41,9 @@ def recall(method):
 def f_score(method):
     p = perf[method]['precision']
     r = perf[method]['recall']
-    return (2 * p * r) / (p + r)
+    x = (2 * p * r) / (p + r)
+    x[(p == 0) & (r == 0)] = 0
+    return x
 
 
 for method in res.keys():

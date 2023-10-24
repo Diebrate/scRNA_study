@@ -6,7 +6,7 @@ Iter = 50;
 
 strings = {'../../data/simulation_data/simulation_id1_0.csv'};
 data = readtable(strjoin(strings, ''));
-%data = readtable('../../data/simulation_data/simulation_id0.csv');
+%data = readtable('../../data/simulation_data/simulation_id1_0.csv');
 T = max(data.time) + 1;
 p = max(data.type) + 1;
 n0 = sum(data.time == 0);
@@ -26,9 +26,9 @@ res = zeros(Iter, T-1);
 for iter=1:Iter
     disp(['m=', num2str(m), ' b=', num2str(iter)]);
     %%% load data
-    strings = {'../../data/simulation_data/simulation_id', num2str(m), '_', num2str(iter-1), '.csv'};
-    data = readtable(strjoin(strings, ''));
-    %data = readtable('../../data/simulation_data/simulation_id0.csv');
+    %strings = {'../../data/simulation_data/simulation_id', num2str(m), '_', num2str(iter-1), '.csv'};
+    %data = readtable(strjoin(strings, ''));
+    data = readtable('../../data/simulation_data/simulation_id0.csv');
     %%%
     X = zeros(T, p);
     for t=1:T
@@ -67,7 +67,7 @@ for iter=1:Iter
     cpt{1, iter} = th{1, iter} - 1;
     for cp=cpt{1, iter}
         if cp > 0
-            res(1,cp) = 1;
+            res(iter,cp) = 1;
         end
     end
 end

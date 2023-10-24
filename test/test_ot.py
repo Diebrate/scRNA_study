@@ -11,12 +11,13 @@ else:
     m = 0
 
 B = 50
-res = np.empty(B, dtype=object)
+data = pd.read_csv('../data/simulation_data/simulation_id1_0.csv')
+T = int(data.time.max())
+d = int(data.type.max()) + 1
+res = np.zeros((B, T))
 
 for k in range(B):
     data = pd.read_csv('../data/simulation_data/simulation_id' + str(m) + '_' + str(k) + '.csv')
-    T = int(data.time.max())
-    d = int(data.type.max()) + 1
 
     centroids = data[['phate1', 'phate2', 'type']].groupby('type').mean().to_numpy()
     costm = test_util.get_cost_matrix(centroids, centroids, dim=2)
@@ -35,10 +36,10 @@ for k in range(B):
         c = np.sum(tmap[t] * costm) + reg * np.sum(phat * np.log(phat / probs[t]))
         cost.append(c)
     cp = test_util.get_cp_from_cost(cost, win_size=1)
-    res[k] = cp
+    res[k, cp - 1] = 1
 
     # # sanity check
     # import matplotlib.pyplot as plt
     # plt.plot(cost)
 
-np.save('../results/simulation/res_cp_id' + str(m), res)
+np.save('../results/simulation/test_ot_id' + str(m), res)
