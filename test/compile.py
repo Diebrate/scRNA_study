@@ -15,7 +15,7 @@ res_ecp = []
 res_mn = []
 
 for m in range(1, M + 1):
-    res_ot.append(np.load('../results/simulation/compile/res_cp_id' + str(m) + '.npy', allow_pickle=True))
+    res_ot.append(np.load('../results/simulation/compile/test_ot_id' + str(m) + '.npy', allow_pickle=True))
     res_ecp.append(np.array(pyreadr.read_r('../results/simulation/compile/test_ecp_id' + str(m) + '.RDS')[None]))
     res_mn.append(loadmat('../results/simulation/compile/test_mn_id' + str(m) + '.mat')['res'])
 

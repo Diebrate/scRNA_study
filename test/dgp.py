@@ -23,6 +23,8 @@ eta = 0.5
 g = []
 change = np.array([np.exp(eta), np.exp(-eta), np.exp(eta), np.exp(-eta)])
 
+data_all = []
+
 for k in range(B):
     Q = [np.arange(1, d + 1) / np.arange(1, d + 1).sum()]
     X = np.zeros((T + 1, n, G + 1))
@@ -60,5 +62,11 @@ for k in range(B):
 
     data[['phate1', 'phate2']] = Y_phate
     data['time'] = np.repeat(np.arange(T + 1), n)
+    data['batch'] = k
 
-    data.to_csv('../data/simulation_data/simulation_id' + str(m) + '_' + str(k) + '.csv')
+    data_all.append(data)
+
+    print('finished batch ' + str(k) + ' for m = ' + str(m))
+
+data_all = pd.concat(data_all, ignore_index=True)
+data_all.to_csv('../data/simulation_data/simulation_id' + str(m) + '.csv')
