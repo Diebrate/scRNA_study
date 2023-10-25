@@ -10,7 +10,7 @@ else:
     m = 0
 
 rng = np.random.default_rng(m + 12345)
-B = 5
+B = 100
 
 n = 1000
 T = 30

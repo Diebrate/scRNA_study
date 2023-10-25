@@ -38,7 +38,8 @@ for k in range(B):
         c = np.sum(tmap[t] * costm) + reg * np.sum(phat * np.log(phat / probs[t]))
         cost.append(c)
     cp = test_util.get_cp_from_cost(cost, win_size=1)
-    res[k, cp - 1] = 1
+    if cp:
+        res[k, cp - 1] = 1
 
     # # sanity check
     # import matplotlib.pyplot as plt
