@@ -18,7 +18,7 @@ d = 4
 G = 50
 means = [-2, -1, 1, 2]
 
-nu = 0.1
+nu = 0.25
 eta = 0.5
 g = []
 change = np.array([np.exp(eta), np.exp(-eta), np.exp(eta), np.exp(-eta)])
