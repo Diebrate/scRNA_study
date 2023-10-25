@@ -5,16 +5,19 @@ res <- list()
 
 args <- commandArgs(trailingOnly = TRUE)
 m <- as.integer(args[1])
+# m <- 0
 
-B <- 50
+dataX <- read.csv(paste0('../data/simulation_data/simulation_id', as.character(m), '.csv'))
+# dataX <- read.csv(paste0('../data/simulation_data/test_sample.csv'))
 
-print(paste0('working on batch ', as.character(m)))
+B <- dataX$batch %>% max() + 1
+T <- dataX$time %>% max()
+d <- dataX$type %>% max() + 1
 
-for(b in 0:(B-1)){
-  dataX <- read.csv(paste0('../data/simulation_data/simulation_id', as.character(m), '_', as.character(b), '.csv'))
+for(b in 1:B){
 
-  T <- dataX$time %>% max()
-  d <- dataX$type %>% max() + 1
+  print(paste0('working on batch ', as.character(m), ' iteration ', as.character(b)))
+
   prob <- matrix(nrow=T+1, ncol=d)
 
   for(t in 1:(T+1)){
@@ -35,7 +38,10 @@ for(b in 0:(B-1)){
   }
   res <- append(res, list(cp))
   print(paste0('working on batch ', as.character(m), 'iteration ', as.character(b)))
+
 }
 
 res <- do.call(rbind, res)
 saveRDS(res, file=paste0('../results/simulation/test_ecp_id', as.character(m), '.RDS'))
+
+

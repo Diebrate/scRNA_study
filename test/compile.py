@@ -3,9 +3,7 @@ import pandas as pd
 import pyreadr
 from scipy.io import loadmat
 
-M = 100
-B = 50
-T = 30
+M = 1000
 
 cp = np.zeros(30)
 cp[[9, 19]] = 1
@@ -58,3 +56,6 @@ for method in res.keys():
     for metric in ['precision', 'recall', 'f-score']:
         perf_mean.loc[method, metric] = np.mean(perf[method][metric])
         perf_std.loc[method, metric] = np.std(perf[method][metric])
+
+# perf_mean.to_csv('../results/perf/perf_mean.csv')
+# perf_std.to_csv('../results/perf/perf_std.csv')

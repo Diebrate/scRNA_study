@@ -10,7 +10,7 @@ else:
     m = 0
 
 rng = np.random.default_rng(m + 12345)
-B = 50
+B = 5
 
 n = 1000
 T = 30
@@ -18,7 +18,7 @@ d = 4
 G = 50
 means = [-2, -1, 1, 2]
 
-nu = 0.05
+nu = 0.1
 eta = 0.5
 g = []
 change = np.array([np.exp(eta), np.exp(-eta), np.exp(eta), np.exp(-eta)])

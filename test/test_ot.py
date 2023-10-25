@@ -10,14 +10,19 @@ if use_sys:
 else:
     m = 0
 
-B = 50
-data = pd.read_csv('../data/simulation_data/simulation_id1_0.csv')
-T = int(data.time.max())
-d = int(data.type.max()) + 1
+data_all = pd.read_csv('../data/simulation_data/simulation_id' + str(m) + '.csv')
+# data_all = pd.read_csv('../data/simulation_data/test_sample.csv')
+B = int(data_all.batch.max())
+T = int(data_all.time.max())
+d = int(data_all.type.max()) + 1
 res = np.zeros((B, T))
 
+eps = 0.001
+reg = 1
+
 for k in range(B):
-    data = pd.read_csv('../data/simulation_data/simulation_id' + str(m) + '_' + str(k) + '.csv')
+
+    data = data_all[data_all.batch == k]
 
     centroids = data[['phate1', 'phate2', 'type']].groupby('type').mean().to_numpy()
     costm = test_util.get_cost_matrix(centroids, centroids, dim=2)
@@ -25,9 +30,6 @@ for k in range(B):
     for t in range(T + 1):
         p = data['type'][data['time'] == t].value_counts(normalize=True).sort_index().to_numpy()
         probs[t, :] = p
-
-    eps = 0.001
-    reg = 1
 
     tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=eps, reg1=reg, reg2=50)
     cost = []

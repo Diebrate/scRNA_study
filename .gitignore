@@ -15,3 +15,4 @@ test/__pycache__/
 *.pyc
 r_df.csv
 *.gmt
+data/simulation_data/test_sample.csv
