@@ -1,16 +1,13 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import phate
 
-use_sys = True
-if use_sys:
-    import sys
-    m = int(sys.argv[1])
-else:
-    m = 0
+import test_util
+import solver
 
-rng = np.random.default_rng(m + 12345)
-B = 10
+rng = np.random.default_rng(999)
+B = 5
 
 n = 1000
 T = 30
@@ -69,7 +66,38 @@ for k in range(B):
 
     data_all.append(data)
 
-    print('finished batch ' + str(k) + ' for m = ' + str(m))
+    print('finished batch ' + str(k))
 
 data_all = pd.concat(data_all, ignore_index=True)
-data_all.to_csv('../data/simulation_data/simulation_id' + str(m) + '.csv')
+
+res = np.zeros((B, T))
+
+eps = 0.001
+reg = 1
+
+for k in range(B):
+
+    data = data_all[data_all.batch == k]
+
+    centroids = data[['phate1', 'phate2', 'type']].groupby('type').mean().to_numpy()
+    costm = test_util.get_cost_matrix(centroids, centroids, dim=2)
+    probs = np.zeros((T + 1, d))
+    for t in range(T + 1):
+        p = data['type'][data['time'] == t].value_counts(normalize=True).sort_index().to_numpy()
+        probs[t, :] = p
+
+    tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=eps, reg1=reg, reg2=50)
+    cost = []
+    for t in range(T):
+        phat = tmap[t].sum(axis=1)
+        c = np.sum(tmap[t] * costm) + reg * np.sum(phat * np.log(phat / probs[t]))
+        cost.append(c)
+    cp = test_util.get_cp_from_cost(cost, win_size=1)
+    if len(cp) > 0:
+        res[k, cp - 1] = 1
+
+    print('b = ' + str(k))
+
+    # sanity check
+    plt.figure()
+    plt.plot(cost)
