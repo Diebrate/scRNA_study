@@ -16,8 +16,6 @@ d <- dataX$type %>% max() + 1
 
 for(b in 1:B){
 
-  print(paste0('working on batch ', as.character(m), ' iteration ', as.character(b)))
-
   prob <- matrix(nrow=T+1, ncol=d)
 
   for(t in 1:(T+1)){
