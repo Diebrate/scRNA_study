@@ -3,7 +3,7 @@ import pandas as pd
 import pyreadr
 from scipy.io import loadmat
 
-M = 1000
+M = 100
 
 cp = np.zeros(30)
 cp[[9, 19]] = 1
