@@ -11,15 +11,15 @@ B = 5
 
 n = 1000
 T = 30
-d = 4
+d = 7
 G = 50
-means = [-2, -1, 1, 2]
+means = np.arange(d) - (d / 2)
 
-nu = 0.1
+nu = 0.2
 eta = 1
 g = []
-change1 = np.array([np.exp(eta), np.exp(-eta), np.exp(eta), np.exp(-eta)])
-change2 = np.array([np.exp(-eta), np.exp(eta), np.exp(-eta), np.exp(eta)])
+change1 = np.exp(eta * np.linspace(-2, 2, d))
+change2 = np.exp(eta * np.linspace(2, -2, d))
 
 data_all = []
 
@@ -71,6 +71,7 @@ for k in range(B):
 data_all = pd.concat(data_all, ignore_index=True)
 
 res = np.zeros((B, T))
+cp_all = []
 
 eps = 0.001
 reg = 1
@@ -92,7 +93,8 @@ for k in range(B):
         phat = tmap[t].sum(axis=1)
         c = np.sum(tmap[t] * costm) + reg * np.sum(phat * np.log(phat / probs[t]))
         cost.append(c)
-    cp = test_util.get_cp_from_cost(cost, win_size=1)
+    cp = test_util.get_cp_from_cost(cost, win_size=1, snr=0.01)
+    cp_all.append(cp)
     if len(cp) > 0:
         res[k, cp - 1] = 1
 
@@ -101,3 +103,5 @@ for k in range(B):
     # sanity check
     plt.figure()
     plt.plot(cost)
+
+print(cp_all)

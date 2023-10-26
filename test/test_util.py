@@ -893,11 +893,11 @@ def cp_detection_mc(data, k, costm, reg=1, reg1=1, reg2=1, balanced=True, sink=T
     return ps
 
 
-def get_cp_from_cost(cost, win_size=None):
+def get_cp_from_cost(cost, win_size=None, snr=0.001):
     l = len(cost)
     if win_size is not None:
         trimmed_cost = cost[(win_size-1):(l - win_size)]
-        res = peak_detection.peaks_detection(trimmed_cost, np.arange(1, l + 1), min_snr=0.001)[0]
+        res = peak_detection.peaks_detection(trimmed_cost, np.arange(1, l + 1), min_snr=snr)[0]
         # res = peak_detection.peaks_detection(cost, np.arange(1, l + 1), min_snr=0.001)[0]
         res = np.array(res)
         # res = res[res >= win_size - 1]

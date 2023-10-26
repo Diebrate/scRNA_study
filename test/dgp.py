@@ -14,15 +14,15 @@ B = 10
 
 n = 1000
 T = 30
-d = 4
+d = 7
 G = 50
-means = [-2, -1, 1, 2]
+means = np.arange(d) - (d / 2)
 
-nu = 0.1
+nu = 0.2
 eta = 1
 g = []
-change1 = np.array([np.exp(eta), np.exp(-eta), np.exp(eta), np.exp(-eta)])
-change2 = np.array([np.exp(-eta), np.exp(eta), np.exp(-eta), np.exp(eta)])
+change1 = np.exp(eta * np.linspace(-2, 2, d))
+change2 = np.exp(eta * np.linspace(2, -2, d))
 
 data_all = []
 
