@@ -28,7 +28,10 @@ for k in range(B):
     costm = test_util.get_cost_matrix(centroids, centroids, dim=2)
     probs = np.zeros((T + 1, d))
     for t in range(T + 1):
-        p = data['type'][data['time'] == t].value_counts(normalize=True).sort_index().to_numpy()
+        counts = data['type'][data['time'] == t].value_counts().reindex(index=np.arange(d), fill_value=0).to_numpy()
+        for count in counts:
+            count += 1
+        p = counts / np.sum(counts)
         probs[t, :] = p
 
     tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=eps, reg1=reg, reg2=50)
