@@ -21,8 +21,8 @@ means = np.arange(d) - (d / 2)
 nu = 0.2
 eta = 1
 g = []
-change1 = np.exp(eta * np.linspace(-2, 2, d))
-change2 = np.exp(eta * np.linspace(2, -2, d))
+change1 = np.exp(eta * np.linspace(-1, 1, d))
+change2 = np.exp(eta * np.linspace(1, -1, d))
 
 data_all = []
 
