@@ -7,19 +7,20 @@ import test_util
 import solver
 
 rng = np.random.default_rng(57 + 12345)
-B = 10
+B = 5
 
 n = 1000
-T = 30
-d = 7
+T = 20
+d = 10
 G = 50
 means = np.arange(d) - (d / 2)
 
-nu = 0.2
+nu = 0.1
 eta = 1
 g = []
-change1 = np.exp(eta * np.linspace(-2, 2, d))
-change2 = np.exp(eta * np.linspace(2, -2, d))
+change = np.array([-1] * (d // 2) + [1] * (d - d // 2))
+change1 = np.exp(eta * change)
+change2 = np.exp(eta * change[::-1])
 
 data_all = []
 
@@ -38,8 +39,8 @@ for k in range(B):
         g0 = np.exp(nu * np.sin(np.pi * (t + np.arange(d)) / d))
         g.append(g0)
         q0 = Q[-1] * g0 / np.sum(Q[-1] * g0)
-        if t + 1 in [10, 20]:
-            change = change1 if (t + 1) == 10 else change2
+        if t + 1 in [5, 10, 15]:
+            change = change2 if (t + 1) == 10 else change1
             q0 = (change * q0) / np.sum(change * q0)
         Q.append(q0)
         n0 = 0
@@ -96,7 +97,7 @@ for k in range(B):
         phat = tmap[t].sum(axis=1)
         c = np.sum(tmap[t] * costm) + reg * np.sum(phat * np.log(phat / probs[t]))
         cost.append(c)
-    cp = test_util.get_cp_from_cost(cost, win_size=1, snr=0.01)
+    cp = test_util.get_cp_from_cost(cost, win_size=1, snr=0.001)
     cp_all.append(cp)
     if len(cp) > 0:
         res[k, cp - 1] = 1

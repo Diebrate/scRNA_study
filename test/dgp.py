@@ -13,16 +13,17 @@ rng = np.random.default_rng(m + 12345)
 B = 10
 
 n = 1000
-T = 30
-d = 7
+T = 20
+d = 10
 G = 50
 means = np.arange(d) - (d / 2)
 
-nu = 0.2
+nu = 0.25
 eta = 1
 g = []
-change1 = np.exp(eta * np.linspace(-1, 1, d))
-change2 = np.exp(eta * np.linspace(1, -1, d))
+change = np.array([-1] * (d // 2) + [1] * (d - d // 2))
+change1 = np.exp(eta * change)
+change2 = np.exp(eta * change[::-1])
 
 data_all = []
 
@@ -41,8 +42,8 @@ for k in range(B):
         g0 = np.exp(nu * np.sin(np.pi * (t + np.arange(d)) / d))
         g.append(g0)
         q0 = Q[-1] * g0 / np.sum(Q[-1] * g0)
-        if t + 1 in [10, 20]:
-            change = change1 if (t + 1) == 10 else change2
+        if t + 1 in [5, 10, 15]:
+            change = change2 if (t + 1) == 10 else change1
             q0 = (change * q0) / np.sum(change * q0)
         Q.append(q0)
         n0 = 0
