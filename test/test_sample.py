@@ -10,7 +10,7 @@ rng = np.random.default_rng(57 + 12345)
 B = 5
 
 n = 1000
-T = 20
+T = 50
 d = 10
 G = 50
 means = np.arange(d) - (d / 2)
@@ -39,8 +39,8 @@ for k in range(B):
         g0 = np.exp(nu * np.sin(np.pi * (t + np.arange(d)) / d))
         g.append(g0)
         q0 = Q[-1] * g0 / np.sum(Q[-1] * g0)
-        if t + 1 in [5, 10, 15]:
-            change = change2 if (t + 1) == 10 else change1
+        if t + 1 in [10, 20, 30, 40]:
+            change = change2 if (t + 1) % 20 == 0 else change1
             q0 = (change * q0) / np.sum(change * q0)
         Q.append(q0)
         n0 = 0
