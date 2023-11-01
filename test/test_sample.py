@@ -6,7 +6,7 @@ import phate
 import test_util
 import solver
 
-rng = np.random.default_rng(57 + 12345)
+rng = np.random.default_rng(12345)
 B = 5
 
 n = 1000
@@ -15,8 +15,8 @@ d = 10
 G = 50
 means = np.arange(d) - (d / 2)
 
-nu = 0.1
-eta = 1
+nu = 0.25
+eta = 0.5
 g = []
 change = np.array([-1] * (d // 2) + [1] * (d - d // 2))
 change1 = np.exp(eta * change)

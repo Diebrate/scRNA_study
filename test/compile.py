@@ -5,8 +5,8 @@ from scipy.io import loadmat
 
 M = 100
 
-cp = np.zeros(20)
-cp[[4, 9, 14]] = 1
+cp = np.zeros(50)
+cp[[9, 19, 29, 39]] = 1
 
 res_ot = []
 res_ecp = []

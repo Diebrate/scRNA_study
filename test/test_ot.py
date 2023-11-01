@@ -40,7 +40,7 @@ for k in range(B):
         phat = tmap[t].sum(axis=1)
         c = np.sum(tmap[t] * costm) + reg * np.sum(phat * np.log(phat / probs[t]))
         cost.append(c)
-    cp = test_util.get_cp_from_cost(cost, win_size=1, snr=0.01)
+    cp = test_util.get_cp_from_cost(cost, win_size=1, snr=0.001)
     if len(cp) > 0:
         res[k, cp - 1] = 1
 
