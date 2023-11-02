@@ -11,21 +11,19 @@ etas = {'low': 0.5, 'high': 1}
 cp = np.zeros(50)
 cp[[9, 19, 29, 39]] = 1
 
-summary = []
-
-
 def prf(pred):
 
     precision = (pred @ cp) / np.sum(pred, axis=1)
     precision[np.sum(pred, axis=1) == 0] = 0
 
-    recall =  (pred @ cp) / np.sum(cp)
+    recall = (pred @ cp) / np.sum(cp)
 
     f_score = (2 * precision * recall) / (precision + recall)
     f_score[(precision == 0) & (recall == 0)] = 0
 
     return precision, recall, f_score
 
+summary = []
 
 for eta in ['low', 'high']:
 
@@ -70,3 +68,4 @@ for eta in ['low', 'high']:
     summary.append(pd.concat(summary_eta, axis='columns', keys=['nu = ' + str(k) for k in nus.values()]))
 
 summary = pd.concat(summary, axis='rows', keys=['eta = ' + str(k) for k in etas.values()])
+summary.to_csv('../results/perf/summary.csv')
