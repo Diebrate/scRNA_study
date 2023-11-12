@@ -17,3 +17,4 @@ r_df.csv
 *.gmt
 data/simulation_data/test_sample.csv
 *.zip
+test_sample*

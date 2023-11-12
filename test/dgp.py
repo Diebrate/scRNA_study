@@ -2,10 +2,10 @@ import numpy as np
 import pandas as pd
 import phate
 
-test_mode = True
+test_mode = False
 if test_mode:
     m = 0
-    B = 3
+    B = 2
 else:
     import sys
     m = int(sys.argv[1])
@@ -19,29 +19,23 @@ d = 10
 G = 50
 means = np.arange(d) - (d / 2)
 
+ns = [1000, 2000]
 nus = [0.1, 0.25]
-etas = [0.5, 1]
+etas = [0.25, 0.5]
 # nu = 0.1
 # eta = 1
 g = []
 change = np.array([-1] * (d // 2) + [1] * (d - d // 2))
 
-data_all = []
+for n in ns:
 
-for k in range(B):
     for nu in nus:
+
         for eta in etas:
+
             change1 = np.exp(eta * change)
             change2 = np.exp(eta * change[::-1])
             Q = [np.ones(d) / d]
-            X = np.zeros((T + 1, n, G + 1))
-            n0 = 0
-            n_mn = rng.multinomial(n, Q[0])
-            for i in range(d):
-                X[0, n0:(n0 + n_mn[i]), :G] = rng.multivariate_normal(mean=np.repeat(means[i], G), cov=np.diag(np.ones(G)), size=n_mn[i])
-                X[0, n0:(n0 + n_mn[i]), G] = i
-                n0 += n_mn[i]
-
             for t in range(T):
                 g0 = np.exp(nu * np.sin(np.pi * (t + np.arange(d)) / d))
                 g.append(g0)
@@ -50,36 +44,58 @@ for k in range(B):
                     change = change2 if (t + 1) % 20 == 0 else change1
                     q0 = (change * q0) / np.sum(change * q0)
                 Q.append(q0)
+
+            n_type = 'low' if n == ns[0] else 'high'
+            nu_type = 'low' if nu == nus[0] else 'high'
+            eta_type = 'low' if eta == etas[0] else 'high'
+
+            data_all = []
+
+            for k in range(B):
+
+                X = np.zeros((T + 1, n, G + 1))
                 n0 = 0
-                n_mn = rng.multinomial(n, Q[t])
+                n_mn = rng.multinomial(n, Q[0])
                 for i in range(d):
-                    X[t+1, n0:(n0 + n_mn[i]), :G] = rng.multivariate_normal(mean=np.repeat(means[i], G), cov=np.diag(np.ones(G)), size=n_mn[i])
-                    X[t+1, n0:(n0 + n_mn[i]), G] = i
+                    X[0, n0:(n0 + n_mn[i]), :G] = rng.multivariate_normal(mean=np.repeat(means[i], G), cov=np.diag(np.ones(G)), size=n_mn[i])
+                    X[0, n0:(n0 + n_mn[i]), G] = i
                     n0 += n_mn[i]
 
-            columns = ['x' + str(i + 1) for i in range(G)] + ['type']
+                for t in range(T):
+                    n0 = 0
+                    n_mn = rng.multinomial(n, Q[t])
+                    for i in range(d):
+                        X[t+1, n0:(n0 + n_mn[i]), :G] = rng.multivariate_normal(mean=np.repeat(means[i], G), cov=np.diag(np.ones(G)), size=n_mn[i])
+                        X[t+1, n0:(n0 + n_mn[i]), G] = i
+                        n0 += n_mn[i]
 
-            df = []
-            for t in range(T + 1):
-                df.append(pd.DataFrame(X[t, :, :], columns=columns))
-            data = pd.concat(df, ignore_index=True)
+                columns = ['x' + str(i + 1) for i in range(G)] + ['type']
 
-            phate_op = phate.PHATE(n_jobs=-2, n_pca=20)
-            Y_phate = phate_op.fit_transform(data[['x' + str(i + 1) for i in range(G)]])
+                df = []
+                for t in range(T + 1):
+                    df.append(pd.DataFrame(X[t, :, :], columns=columns))
+                data = pd.concat(df, ignore_index=True)
 
-            data[['phate1', 'phate2']] = Y_phate
-            data['time'] = np.repeat(np.arange(T + 1), n)
-            data['batch'] = k
-            data['nu'] = 'low' if nu == nus[0] else 'high'
-            data['eta'] = 'low' if eta == etas[0] else 'high'
+                phate_op = phate.PHATE(n_jobs=-2, n_pca=20)
+                Y_phate = phate_op.fit_transform(data[['x' + str(i + 1) for i in range(G)]])
 
-            data_all.append(data)
+                data[['phate1', 'phate2']] = Y_phate
+                data['time'] = np.repeat(np.arange(T + 1), n)
+                data['batch'] = k
 
-            print('finished batch ' + str(k) + ' for m = ' + str(m) + '\nnu = ' + str(nu) + ' eta = ' + str(eta))
+                data_all.append(data)
 
-data_all = pd.concat(data_all, ignore_index=True)
-if test_mode:
-    data_all.to_csv('../data/simulation_data/test_sample.csv')
-else:
+                print(f'finished batch {k}, n = {n}, nu = {nu}, eta = {eta}')
 
-    data_all.to_csv('../data/simulation_data/simulation_id' + str(m) + '.csv')
+            data_all = pd.concat(data_all, ignore_index=True)
+
+            data_all['n'] = n_type
+            data_all['nu'] = nu_type
+            data_all['eta'] = eta_type
+
+            if test_mode:
+                data_all.to_csv(f'../data/simulation_data/test_sample_{n_type}_n_{nu_type}_nu_{eta_type}_eta.csv')
+            else:
+                data_all.to_csv(f'../data/simulation_data/simulation_id{m}_{n_type}_n_{nu_type}_nu_{eta_type}_eta.csv')
+
+print(f'finished m = {m}')
