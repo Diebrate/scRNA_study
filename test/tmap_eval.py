@@ -7,7 +7,7 @@ import test_util
 rng = np.random.default_rng(2023)
 
 M = 100
-J = 1000
+J = 10000
 T = 50
 d = 10
 G = 50
@@ -36,10 +36,11 @@ phate_op = phate.PHATE(n_jobs=-2, n_pca=20)
 Y_phate = phate_op.fit_transform(X)
 
 centroids = np.zeros((d, 2))
-costm = test_util.get_cost_matrix(centroids, centroids, dim=2)
 
 for i in range(d):
-    centroids = Y_phate[(i * d):((i + 1) * d)].mean(axis=1)
+    centroids[i, :] = Y_phate[(i * J):((i + 1) * J)].mean(axis=0)
+
+costm = test_util.get_cost_matrix(centroids, centroids, dim=2)
 
 perf_cp = []
 perf_ncp = []
@@ -87,24 +88,25 @@ for n_key in ['low', 'high']:
                             diff0_cp += np.power(tmap[t] - res[i][j, t, :, :], 2).sum()
                         else:
                             diff0_ncp += np.power(tmap[t] - res[i][j, t, :, :], 2).sum()
-                    diff_cp.append(diff0_cp / (T - len(cp)))
-                    diff_ncp.append(diff_ncp / len(cp))
+                    diff_cp.append(diff0_cp / len(cp))
+                    diff_ncp.append(diff0_ncp / (T - len(cp)))
 
-            txt = '{}({})'
+            txt = '{:.4f}({:.4f})'
 
-            summary_cp.loc[eta_key, nu_key] = txt.format(np.round(np.mean(diff_cp), 3),
-                                                         np.round(np.std(diff_cp), 3))
-            summary_ncp.loc[eta_key, nu_key] = txt.format(np.round(np.mean(diff_ncp), 3),
-                                                          np.round(np.std(diff_cp), 3))
-            summary_cp.columns = ['nu = ' + str(k) for k in nus.values()]
-            summary_cp.index = ['eta = ' + str(k) for k in etas.values()]
-            summary_ncp.columns = ['nu = ' + str(k) for k in nus.values()]
-            summary_ncp.index = ['eta = ' + str(k) for k in etas.values()]
+            summary_cp.loc[eta_key, nu_key] = txt.format(np.round(np.mean(diff_cp), 4),
+                                                         np.round(np.std(diff_cp), 4))
+            summary_ncp.loc[eta_key, nu_key] = txt.format(np.round(np.mean(diff_ncp), 4),
+                                                          np.round(np.std(diff_ncp), 4))
+
+    summary_cp.columns = [f'$\\nu={k}$' for k in nus.values()]
+    summary_cp.index = [f'$\\eta={k}$' for k in etas.values()]
+    summary_ncp.columns = [f'$\\nu={k}$' for k in nus.values()]
+    summary_ncp.index = [f'$\\eta={k}$' for k in etas.values()]
 
     perf_cp.append(summary_cp)
     perf_ncp.append(summary_ncp)
 
-perf_cp = pd.concat(perf_cp, axis='rows', keys=['n = ' + str(k) for k in ns.values()])
-perf_ncp = pd.concat(perf_ncp, axis='rows', keys=['n = ' + str(k) for k in ns.values()])
+perf_cp = pd.concat(perf_cp, axis='rows', keys=[f'$n={k}$' for k in ns.values()])
+perf_ncp = pd.concat(perf_ncp, axis='rows', keys=[f'$n={k}$' for k in ns.values()])
 perf_cp.to_csv('../results/perf/summary_conv_cp.csv')
-perf_cp.to_csv('../results/perf/summary_conv_ncp.csv')
+perf_ncp.to_csv('../results/perf/summary_conv_ncp.csv')

@@ -60,16 +60,16 @@ for n in ['low', 'high']:
 
             summary_temp = pd.DataFrame(index=res.keys(), columns=['precision', 'recall', 'f-score'])
 
-            txt = '{}({})'
+            txt = '{:.4f}({:.4f})'
 
             for method in res.keys():
                 for metric in ['precision', 'recall', 'f-score']:
-                    summary_temp.loc[method, metric] = txt.format(np.round(np.mean(perf[method][metric]), 3),
-                                                                  np.round(np.std(perf[method][metric]), 3))
+                    summary_temp.loc[method, metric] = txt.format(np.round(np.mean(perf[method][metric]), 4),
+                                                                  np.round(np.std(perf[method][metric]), 4))
 
             summary_eta.append(summary_temp)
 
-        summary.append(pd.concat(summary_eta, axis='columns', keys=['nu = ' + str(k) for k in nus.values()]))
+        summary.append(pd.concat(summary_eta, axis='columns', keys=[f'$\\nu={k}$' for k in nus.values()]))
 
-    summary = pd.concat(summary, axis='rows', keys=['eta = ' + str(k) for k in etas.values()])
+    summary = pd.concat(summary, axis='rows', keys=[f'$\\eta={k}$' for k in etas.values()])
     summary.to_csv(f'../results/perf/summary_{n}_n.csv')
