@@ -60,4 +60,4 @@ for n in ['low', 'high']:
                 # plt.plot(cost)
 
             np.save(f'../results/simulation/{n}_n/{nu}_nu_{eta}_eta/test_ot_id{m}', res)
-            np.save(f'../results/simulation/{n}_n/{nu}_nu_{eta}_eta/tmap_id{m}', res)
+            np.save(f'../results/simulation/{n}_n/{nu}_nu_{eta}_eta/tmap_id{m}', tmap_all)

@@ -22,9 +22,6 @@ means = np.arange(d) - (d / 2)
 ns = [1000, 2000]
 nus = [0.1, 0.25]
 etas = [0.5, 1]
-# nu = 0.1
-# eta = 1
-g = []
 cp_vec = np.array([-1] * (d // 2) + [1] * (d - d // 2))
 
 for n in ns:
@@ -40,7 +37,6 @@ for n in ns:
             Q = [np.ones(d) / d]
             for t in range(T):
                 g0 = np.exp(nu * np.sin(np.pi * (t + np.arange(d)) / d))
-                g.append(g0)
                 q0 = Q[-1] * g0 / np.sum(Q[-1] * g0)
                 if t + 1 in [10, 20, 30, 40]:
                     change = change2 if (t + 1) % 20 == 0 else change1
