@@ -99,27 +99,25 @@ ot_df = pd.read_csv(r'..\data\proc_data\ot_df.csv')
 ot_df = ot_df[ot_df['day'] != 8.25]
 ot_df = ot_df[ot_df['day'] != 8.75]
 
-plot = 'schiebinger'
-
-if plot == 'schiebinger':
+plot = 'seurat'
+plot_df = full_df if plot == 'schiebinger' else ot_df
     
-    fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True, figsize=(15, 8))
-    scatter = ax[0].scatter(x=full_df['x'], y=full_df['y'], s=0.25, c=full_df['day'])
-    ax[0].legend(*scatter.legend_elements(num=19), title='day')
-    ax[0].set_xlabel('x')
-    ax[0].set_ylabel('y')
+fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True, figsize=(18, 8))
+scatter = ax[0].scatter(x=plot_df['x'], y=plot_df['y'], s=0.25, c=plot_df['day'])
+ax[0].set_xlabel('phate 1', fontsize=18)
+ax[0].set_ylabel('phate 2', fontsize=18)
+ax[0].tick_params(axis='both', labelsize=18)
+cbar = plt.colorbar(scatter, ax=ax[0])
+cbar.set_label('day', size=16)
+cbar.ax.tick_params(labelsize=18)
 
-    sns.scatterplot(x='x', y='y', data=full_df, hue='cell type', linewidth=0, s=1, ax=ax[1])
+sns.scatterplot(x='x', y='y', data=plot_df, hue='cell type', linewidth=0, s=1, ax=ax[1])
+ax[1].set_xlabel('phate 1', fontsize=18)
+ax[1].set_ylabel('phate 2', fontsize=18)
+ax[1].tick_params(axis='both', labelsize=18)
+h, l = ax[1].get_legend_handles_labels()
+ax[1].legend(h, l, fontsize=16, title='cell type', title_fontsize=16, loc='upper left', bbox_to_anchor=(1, 1))
 
-elif plot == 'seurat':
-    
-    fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True, figsize=(15, 8))
-    scatter = ax[0].scatter(x=ot_df['x'], y=ot_df['y'], s=0.25, c=ot_df['day'])
-    ax[0].legend(*scatter.legend_elements(num=19), title='day')
-    ax[0].set_xlabel('x')
-    ax[0].set_ylabel('y')
-
-    sns.scatterplot(x='x', y='y', data=ot_df, hue='cell type', linewidth=0, s=1, ax=ax[1])
 
 check_gene = False
 gene_list = ['Fut9', 'Shisa8', 'Dmrtc2', 'Zic3', 'Pou3f1']

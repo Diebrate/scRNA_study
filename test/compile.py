@@ -7,7 +7,7 @@ M = 100
 
 ns = {'low': 1000, 'high': 2000}
 nus = {'low': 0.1, 'high': 0.25}
-etas = {'low': 0.5, 'high': 1}
+etas = {'low': 0.25, 'high': 0.5}
 
 cp = np.zeros(50)
 cp[[9, 19, 29, 39]] = 1
@@ -35,7 +35,7 @@ for n in ['low', 'high']:
 
         for nu in ['low', 'high']:
 
-            file_path = f'../results/simulation/{n}_n/{nu}_nu_{eta}_eta/'
+            file_path = f'../results/simulation/compile/{n}_n/{nu}_nu_{eta}_eta/'
 
             res_ot = []
             res_ecp = []
@@ -46,9 +46,9 @@ for n in ['low', 'high']:
                 res_ecp.append(np.array(pyreadr.read_r(file_path + 'test_ecp_id' + str(m) + '.RDS')[None]))
                 res_mn.append(loadmat(file_path + 'test_mn_id' + str(m) + '.mat')['res'])
 
-            res = {'ot': np.vstack(res_ot),
-                   'ecp': np.vstack(res_ecp),
-                   'mn': np.vstack(res_mn)}
+            res = {'TIMO': np.vstack(res_ot),
+                   'ECP': np.vstack(res_ecp),
+                   'MN': np.vstack(res_mn)}
 
             perf = {method: {'precision': 0, 'recall': 0, 'f-score': 0} for method in res.keys()}
 

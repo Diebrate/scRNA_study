@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.transforms import Bbox
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.colors import LinearSegmentedColormap
 
 import os
 import sys
@@ -145,9 +146,17 @@ if graph_tmap:
 
 graph_tmap_hist = True
 
-from matplotlib.transforms import Bbox
-
 if graph_tmap_hist:
+
+    # Define Morandi-style colors (You can adjust these hex colors)
+    morandi_colors = ['#abbdbe', '#c0b2a5', '#d4a5a5', '#929a88', '#7e7f9a', '#6e7582']
+
+    # Create a custom colormap
+    morandi_cmap = LinearSegmentedColormap.from_list("morandi", morandi_colors, N=256)
+
+    # Histogram bar color
+    hist_bar_color = '#929a88'  # A color from the Morandi palette
+
     for i in range(T - 1):
         fig, axs = plt.subplots(2, 2, sharex="col", sharey="row", figsize=(8, 8),
                                 gridspec_kw=dict(height_ratios=[1, 2.5], width_ratios=[2.5, 1],
@@ -157,7 +166,7 @@ if graph_tmap_hist:
         axs[1, 1].set_box_aspect(2.5/1)
 
         # Plot the heatmap
-        im = axs[1, 0].imshow(tmap[i], 'viridis')
+        im = axs[1, 0].imshow(tmap[i], morandi_cmap)
 
         # Create colorbar with label at the bottom
         cbar = fig.colorbar(im, ax=axs[1, 0], location="bottom")
@@ -205,8 +214,16 @@ if graph_tmap_hist:
         axs[0, 0].set_xticklabels(type_list, rotation=45, ha="right", minor=False)
 
         # Plot the histograms
-        axs[1, 1].barh(y=type_list, width=tmap[i].sum(axis=1))
-        axs[0, 0].bar(x=type_list, height=tmap[i].sum(axis=0))
+        axs[1, 1].barh(y=type_list, width=tmap[i].sum(axis=1), color=hist_bar_color)
+        axs[0, 0].bar(x=type_list, height=tmap[i].sum(axis=0), color=hist_bar_color)
+
+        # Set y-axis limits
+        axs[1, 1].set_xlim(0, 1)
+        axs[0, 0].set_ylim(0, 1)
+
+        for side in ['top', 'right', 'left', 'bottom']:
+            axs[1, 1].spines[side].set_visible(False)
+            axs[0, 0].spines[side].set_visible(False)
 
         # Resize
         (x0m, y0m), (x1m, y1m) = axs[1, 0].get_position().get_points()  # main heatmap
@@ -215,9 +232,17 @@ if graph_tmap_hist:
         (x0v, y0v), (x1v, y1v) = axs[1, 1].get_position().get_points()  # vertical histogram
         axs[1, 1].set_position(Bbox([[x0v, y0m], [x1v, y1m]]))
 
-        # Set separate titles for the histograms
-        axs[1, 1].set_title('Cell type distribution at ' + time_names[i])
+        # Set title for the vertical histogram
+        # axs[1, 1].set_title('Cell type distribution at ' + time_names[i])
         axs[0, 0].set_title('Cell type distribution at ' + time_names[i+1])
+
+        # Rotate the title and move it to the right of the horizontal histogram
+        axs[1, 1].set_title('Cell type distribution at ' + time_names[i],
+                            rotation=-90,
+                            # fontsize=10,
+                            x=1.25,
+                            y=0.15,
+                            ha='center')
 
         fig.suptitle('Transport map from ' + time_names[i] + ' to ' + time_names[i+1])
 

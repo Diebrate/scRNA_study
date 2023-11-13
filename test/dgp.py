@@ -21,11 +21,11 @@ means = np.arange(d) - (d / 2)
 
 ns = [1000, 2000]
 nus = [0.1, 0.25]
-etas = [0.25, 0.5]
+etas = [0.5, 1]
 # nu = 0.1
 # eta = 1
 g = []
-change = np.array([-1] * (d // 2) + [1] * (d - d // 2))
+cp_vec = np.array([-1] * (d // 2) + [1] * (d - d // 2))
 
 for n in ns:
 
@@ -33,8 +33,10 @@ for n in ns:
 
         for eta in etas:
 
-            change1 = np.exp(eta * change)
-            change2 = np.exp(eta * change[::-1])
+            print(f'starting n = {n}, nu = {nu}, eta = {eta}')
+
+            change1 = np.exp(eta * cp_vec)
+            change2 = np.exp(eta * cp_vec[::-1])
             Q = [np.ones(d) / d]
             for t in range(T):
                 g0 = np.exp(nu * np.sin(np.pi * (t + np.arange(d)) / d))
