@@ -23,12 +23,13 @@ for(n0 in c('low', 'high')){
       for(b in 1:B){
 
         data0 <- dataX %>% filter(batch == (b - 1))
+        data0$type <- factor(data0$type, levels=0:(d-1))
 
         prob <- matrix(nrow=T+1, ncol=d)
 
         for(t in 1:(T+1)){
           prob[t,] <- data0 %>% filter(time == (t - 1)) %>%
-            group_by(type) %>%
+            group_by(type, .drop=FALSE) %>%
             summarise(n=n()) %>%
             arrange(type) %>%
             mutate(p=n/sum(n)) %>%
