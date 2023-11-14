@@ -38,8 +38,8 @@ for n in ns:
             for t in range(T):
                 g0 = np.exp(nu * np.sin(np.pi * (t + np.arange(d)) / d))
                 q0 = Q[-1] * g0 / np.sum(Q[-1] * g0)
-                if t + 1 in [10, 20, 30, 40]:
-                    change = change2 if (t + 1) % 20 == 0 else change1
+                if t in [10, 20, 30, 40]:
+                    change = change2 if t % 20 == 0 else change1
                     q0 = (change * q0) / np.sum(change * q0)
                 Q.append(q0)
 
@@ -52,19 +52,12 @@ for n in ns:
             for k in range(B):
 
                 X = np.zeros((T + 1, n, G + 1))
-                n0 = 0
-                n_mn = rng.multinomial(n, Q[0])
-                for i in range(d):
-                    X[0, n0:(n0 + n_mn[i]), :G] = rng.multivariate_normal(mean=np.repeat(means[i], G), cov=np.diag(np.ones(G)), size=n_mn[i])
-                    X[0, n0:(n0 + n_mn[i]), G] = i
-                    n0 += n_mn[i]
-
-                for t in range(T):
+                for t in range(T + 1):
                     n0 = 0
                     n_mn = rng.multinomial(n, Q[t])
                     for i in range(d):
-                        X[t+1, n0:(n0 + n_mn[i]), :G] = rng.multivariate_normal(mean=np.repeat(means[i], G), cov=np.diag(np.ones(G)), size=n_mn[i])
-                        X[t+1, n0:(n0 + n_mn[i]), G] = i
+                        X[t, n0:(n0 + n_mn[i]), :G] = rng.multivariate_normal(mean=np.repeat(means[i], G), cov=np.diag(np.ones(G)), size=n_mn[i])
+                        X[t, n0:(n0 + n_mn[i]), G] = i
                         n0 += n_mn[i]
 
                 columns = ['x' + str(i + 1) for i in range(G)] + ['type']

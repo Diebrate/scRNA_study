@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
-import phate
 import solver
-import test_util
 
 rng = np.random.default_rng(2023)
 
@@ -23,24 +21,7 @@ etas = {'low': 0.5, 'high': 1}
 
 cp_vec = np.array([-1] * (d // 2) + [1] * (d - d // 2))
 
-cp = [9, 19, 29, 39]
-
-X = np.zeros((d * J, G))
-
-for i in range(d):
-    X[(i * J):((i + 1) * J)] = rng.multivariate_normal(mean=np.repeat(means[i], G),
-                                                       cov=np.diag(np.ones(G)),
-                                                       size=J)
-
-phate_op = phate.PHATE(n_jobs=-2, n_pca=20)
-Y_phate = phate_op.fit_transform(X)
-
-centroids = np.zeros((d, 2))
-
-for i in range(d):
-    centroids[i, :] = Y_phate[(i * J):((i + 1) * J)].mean(axis=0)
-
-costm = test_util.get_cost_matrix(centroids, centroids, dim=2)
+cp = [10, 20, 30, 40]
 
 perf_cp = []
 perf_ncp = []
@@ -58,6 +39,8 @@ for n_key in ['low', 'high']:
             eta = etas[eta_key]
             nu = nus[nu_key]
 
+            costm = np.load(f'../data/simulation_data/cost_{nu_key}_nu_{eta_key}_eta.npy')
+
             diff_cp = []
             diff_ncp = []
 
@@ -66,9 +49,9 @@ for n_key in ['low', 'high']:
             Q = np.ones((T + 1, d)) / d
             for t in range(T):
                 g0 = np.exp(nu * np.sin(np.pi * (t + np.arange(d)) / d))
-                q0 = Q[-1] * g0 / np.sum(Q[-1] * g0)
-                if t + 1 in [10, 20, 30, 40]:
-                    change = change2 if (t + 1) % 20 == 0 else change1
+                q0 = Q[t] * g0 / np.sum(Q[t] * g0)
+                if t in [10, 20, 30, 40]:
+                    change = change2 if t % 20 == 0 else change1
                     q0 = (change * q0) / np.sum(change * q0)
                 Q[t + 1, :] = q0
 

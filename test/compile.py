@@ -7,7 +7,7 @@ M = 100
 
 ns = {'low': 1000, 'high': 2000}
 nus = {'low': 0.1, 'high': 0.25}
-etas = {'low': 0.25, 'high': 0.5}
+etas = {'low': 0.25, 'high': 1}
 
 cp = np.zeros(50)
 cp[[9, 19, 29, 39]] = 1
