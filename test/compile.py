@@ -50,22 +50,24 @@ for n in ['low', 'high']:
                    'ECP': np.vstack(res_ecp),
                    'MN': np.vstack(res_mn)}
 
-            perf = {method: {'precision': 0, 'recall': 0, 'f-score': 0} for method in res.keys()}
+            N = res['TIMO'].shape[0]
+
+            perf = {method: {'precision': 0, 'recall': 0, 'F-score': 0} for method in res.keys()}
 
             for method in res.keys():
                 p, r, f = prf(res[method])
                 perf[method]['precision'] = p
                 perf[method]['recall'] = r
-                perf[method]['f-score'] = f
+                perf[method]['F-score'] = f
 
-            summary_temp = pd.DataFrame(index=res.keys(), columns=['precision', 'recall', 'f-score'])
+            summary_temp = pd.DataFrame(index=res.keys(), columns=['precision', 'recall', 'F-score'])
 
-            txt = '{:.4f}({:.4f})'
+            txt = '{:.2f}({:.2f})'
 
             for method in res.keys():
-                for metric in ['precision', 'recall', 'f-score']:
-                    summary_temp.loc[method, metric] = txt.format(np.round(np.mean(perf[method][metric]), 4),
-                                                                  np.round(np.std(perf[method][metric]), 4))
+                for metric in ['precision', 'recall', 'F-score']:
+                    summary_temp.loc[method, metric] = txt.format(np.mean(perf[method][metric]),
+                                                                  100 * np.std(perf[method][metric]) / np.sqrt(N))
 
             summary_eta.append(summary_temp)
 

@@ -76,10 +76,10 @@ for n_key in ['low', 'high']:
 
             txt = '{:.2f}({:.2f})'
 
-            summary_cp.loc[eta_key, nu_key] = txt.format(np.round(10000 * np.mean(diff_cp), 2),
-                                                         np.round(10000 * np.std(diff_cp) / np.sqrt(M * len(res)), 2))
-            summary_ncp.loc[eta_key, nu_key] = txt.format(np.round(10000 * np.mean(diff_ncp), 2),
-                                                          np.round(10000 * np.std(diff_ncp) / np.sqrt(M * len(res)), 2))
+            summary_cp.loc[eta_key, nu_key] = txt.format(10000 * np.mean(diff_cp),
+                                                         10000 * np.std(diff_cp) / np.sqrt(M * len(res)))
+            summary_ncp.loc[eta_key, nu_key] = txt.format(10000 * np.mean(diff_ncp),
+                                                          10000 * np.std(diff_ncp) / np.sqrt(M * len(res)))
 
     summary_cp.columns = [f'$\\nu={k}$' for k in nus.values()]
     summary_cp.index = [f'$\\eta={k}$' for k in etas.values()]
