@@ -95,6 +95,15 @@ x = list(range(T - 1))
 # z = np.polyfit(x, [float(i) for i in cost], 7)
 # f = np.poly1d(z)
 
+# Define Morandi-style colors (You can adjust these hex colors)
+morandi_colors = ['#abbdbe', '#c0b2a5', '#d4a5a5', '#929a88', '#7e7f9a', '#6e7582']
+
+# Create a custom colormap
+morandi_cmap = LinearSegmentedColormap.from_list("morandi", morandi_colors, N=256)
+
+# Histogram bar color
+hist_bar_color = '#929a88'  # A color from the Morandi palette
+
 graph_cost0 = False
 
 if graph_cost0:
@@ -144,18 +153,9 @@ if graph_tmap:
         reform_time_name = time_names[i].replace('.', '_') + 'to' + time_names[i+1].replace('.', '_')
         # plt.savefig(r'..\image\wot_tmap\transport_map_'+reform_time_name)
 
-graph_tmap_hist = True
+graph_tmap_hist = False
 
 if graph_tmap_hist:
-
-    # Define Morandi-style colors (You can adjust these hex colors)
-    morandi_colors = ['#abbdbe', '#c0b2a5', '#d4a5a5', '#929a88', '#7e7f9a', '#6e7582']
-
-    # Create a custom colormap
-    morandi_cmap = LinearSegmentedColormap.from_list("morandi", morandi_colors, N=256)
-
-    # Histogram bar color
-    hist_bar_color = '#929a88'  # A color from the Morandi palette
 
     for i in range(T - 1):
         fig, axs = plt.subplots(2, 2, sharex="col", sharey="row", figsize=(8, 8),
@@ -249,13 +249,13 @@ if graph_tmap_hist:
         reform_time_name = time_names[i].replace('.', '_') + 'to' + time_names[i+1].replace('.', '_')
         # plt.savefig(r'..\image\wot_tmap\transport_map_hist_'+reform_time_name, bbox_inches='tight')
 
-graph_all = False
+graph_all = True
 
 if graph_all:
     fig, axs = plt.subplots(9, 4, figsize=(36, 85))
     for i in range(T - 1):
         ax = axs[i // 4, i % 4]
-        img = ax.imshow(tmap[i], 'viridis')
+        img = ax.imshow(tmap[i], morandi_cmap)
         ax.set_title('Transport map from ' + time_names[i] + ' to ' + time_names[i+1])
         ax.set_xticks(np.arange(len(type_list)))
         ax.set_yticks(np.arange(len(type_list)))
@@ -263,10 +263,10 @@ if graph_all:
         ax.set_yticklabels(type_list)
         ax.label_outer()
         reform_time_name = time_names[i].replace('.', '_') + 'to' + time_names[i+1].replace('.', '_')
-    cbar = fig.colorbar(cm.ScalarMappable(cmap='viridis'), ax=axs, orientation='horizontal', anchor=(0.2, -0.7), aspect=40)
+    cbar = fig.colorbar(cm.ScalarMappable(cmap=morandi_cmap), ax=axs, orientation='horizontal', anchor=(0.2, -0.7), aspect=40)
     cbar.set_label('probability')
     plt.tight_layout(rect=[0, 0.1, 1, 1])
-    # plt.savefig(r'../image/tmap_all.png')
+    plt.savefig(r'../image/tmap_all.png')
 
 print(cp_days)
 
