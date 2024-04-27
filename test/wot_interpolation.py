@@ -19,10 +19,6 @@ sink = False
 win_size = 1
 weight = None
 
-do_cost = True
-do_save = False
-do_load = False
-
 reg = 0.001 # 0.05
 reg1 = 1
 reg2 = 1
@@ -58,31 +54,21 @@ for t in range(T):
     probs.append(p_temp)
 probs = np.array(probs)
 costm = test_util.get_cost_matrix(centroids, centroids, dim=dim)
-# costm = costm / 100000
-# costm = costm / np.median(costm)
 tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=reg, reg1=reg1, reg2=50)
 cost = solver.loss_unbalanced_all_local(probs, costm, reg, reg1, reg2=50, sink=sink, win_size=win_size, weight=weight, partial=True)
-
-tmap_direct = []
-for t in range(T-1):
-    tmap_temp = solver.ot_unbalanced(probs[t, ], probs[t+1, ], costm, reg=reg, reg1=reg1, reg2=50)
-    # append the normalized tmap by row
-    tmap_direct.append(tmap_temp / tmap_temp.sum(axis=1)[:, None])
-
-# calculate the coupled tmaps
-tmap_couple = [np.eye(k)]
-
-for t in range(T-1):
-    # normalize tmap[t] by row
-    tmap_temp = tmap[t] / tmap[t].sum(axis=1)[:, None]
-    tmap_couple.append(tmap_couple[-1] @ tmap_temp)
-tmap_couple = tmap_couple[1:]
-
-# calculate distance between coupled and direct tmaps
-dist = []
+cost_couple = np.zeros(T - 1)
 for t in range(T - 1):
-    dist.append((tmap_couple[t] * (np.log(tmap_couple[t]) - np.log(tmap_direct[t]))).sum())
+    cost_couple[t] = np.sum(costm * tmap[t] + reg1 * solver.kl_div(tmap[t].sum(axis=1), probs[t, ]))
+cost_couple = np.cumsum(cost_couple)
 
-# plot the distance as a function of time lag
-plt.plot(dist)
+cost_direct = np.zeros(T - 1)
+for t in range(T - 1):
+    tmap_temp = solver.ot_unbalanced(probs[0, ], probs[t+1, ], costm, reg=reg, reg1=reg1, reg2=50)
+    cost_direct[t] = np.sum(costm * tmap_temp + reg1 * solver.kl_div(tmap_temp.sum(axis=1), probs[0, ]))
+cost_direct = np.cumsum(cost_direct)
+
+# compare cost_couple and cost_direct
+plt.plot(cost_couple, label='couple')
+plt.plot(cost_direct, label='direct')
+plt.legend()
 plt.show()
