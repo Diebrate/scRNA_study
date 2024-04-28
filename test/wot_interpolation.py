@@ -55,20 +55,35 @@ for t in range(T):
 probs = np.array(probs)
 costm = test_util.get_cost_matrix(centroids, centroids, dim=dim)
 tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=reg, reg1=reg1, reg2=50)
-cost = solver.loss_unbalanced_all_local(probs, costm, reg, reg1, reg2=50, sink=sink, win_size=win_size, weight=weight, partial=True)
-cost_couple = np.zeros(T - 1)
-for t in range(T - 1):
-    cost_couple[t] = np.sum(costm * tmap[t] + reg1 * solver.kl_div(tmap[t].sum(axis=1), probs[t, ]))
-cost_couple = np.cumsum(cost_couple)
 
-cost_direct = np.zeros(T - 1)
+cost_pair = np.zeros(T - 1)
 for t in range(T - 1):
-    tmap_temp = solver.ot_unbalanced(probs[0, ], probs[t+1, ], costm, reg=reg, reg1=reg1, reg2=50)
-    cost_direct[t] = np.sum(costm * tmap_temp + reg1 * solver.kl_div(tmap_temp.sum(axis=1), probs[0, ]))
-cost_direct = np.cumsum(cost_direct)
+    cost_pair[t] = np.sum(costm * tmap[t])
+    cost_pair[t] += reg1 * solver.kl_div(tmap[t].sum(axis=1), probs[t, ])
+
+max_lag = 16
+cost_couple = [[] for lag in range(max_lag)]
+for lag in range(max_lag):
+    for t in range(T - lag - 1):
+        cost_couple[lag].append(np.sum(cost_pair[t:t+lag+1]))
+
+cost_direct = [[] for lag in range(max_lag)]
+for lag in range(max_lag):
+    for t in range(T - lag - 1):
+        tmap_temp = solver.ot_unbalanced(probs[t, ], probs[t + lag + 1, ], costm, reg=reg, reg1=reg1, reg2=50)
+        cost_temp = np.sum(costm * tmap_temp)
+        cost_temp += reg1 * solver.kl_div(tmap_temp.sum(axis=1), probs[t, ])
+        cost_direct[lag].append(cost_temp)
+
+cost_ratio = np.zeros(max_lag)
+for lag in range(max_lag):
+    cost_ratio[lag] = np.mean(np.array(cost_direct[lag]) / np.array(cost_couple[lag]))
 
 # compare cost_couple and cost_direct
-plt.plot(cost_couple, label='couple')
-plt.plot(cost_direct, label='direct')
-plt.legend()
+plt.plot(cost_ratio)
+plt.title('ratio of direct cost over coupled cost')
+plt.xlabel('number of omitted time points')
+plt.ylabel('cost ratio')
+# add a horizontal line showing 95%
+plt.axhline(y=0.95, color='r', linestyle='--')
 plt.show()
