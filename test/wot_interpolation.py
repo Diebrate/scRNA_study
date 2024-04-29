@@ -21,7 +21,7 @@ weight = None
 
 reg = 0.001 # 0.05
 reg1 = 1
-reg2 = 1
+reg2 = 50
 
 time_names = pd.read_csv('../data/time_names.csv', index_col=0)
 time_names = time_names['time'].to_numpy()
@@ -54,26 +54,40 @@ for t in range(T):
     probs.append(p_temp)
 probs = np.array(probs)
 costm = test_util.get_cost_matrix(centroids, centroids, dim=dim)
-tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=reg, reg1=reg1, reg2=50)
+tmap = solver.ot_unbalanced_all(probs[:-1, ].T, probs[1:, ].T, costm, reg=reg, reg1=reg1, reg2=reg2)
+cost = solver.loss_unbalanced_all_local(probs, costm, reg, reg1, reg2=reg2, sink=sink, win_size=win_size, weight=weight, partial=True)
+
+cp = test_util.get_cp_from_cost(cost, win_size=win_size)
+cp_days = time_names[cp]
+t_segments = []
+for point in (list(cp) + [T - 1]):
+    if t_segments:
+        t_segments.append([t_segments[-1][1] + 1, point])
+    else:
+        t_segments.append([0, point])
 
 cost_pair = np.zeros(T - 1)
 for t in range(T - 1):
     cost_pair[t] = np.sum(costm * tmap[t])
     cost_pair[t] += reg1 * solver.kl_div(tmap[t].sum(axis=1), probs[t, ])
 
-max_lag = 16
+max_lag = 8
 cost_couple = [[] for lag in range(max_lag)]
 for lag in range(max_lag):
-    for t in range(T - lag - 1):
-        cost_couple[lag].append(np.sum(cost_pair[t:t+lag+1]))
+    for segment in t_segments:
+        if segment[1] - segment[0] - lag > 0:
+            for t in range(segment[0], segment[1] - lag):
+                cost_couple[lag].append(np.sum(cost_pair[t:t+lag+1]))
 
 cost_direct = [[] for lag in range(max_lag)]
 for lag in range(max_lag):
-    for t in range(T - lag - 1):
-        tmap_temp = solver.ot_unbalanced(probs[t, ], probs[t + lag + 1, ], costm, reg=reg, reg1=reg1, reg2=50)
-        cost_temp = np.sum(costm * tmap_temp)
-        cost_temp += reg1 * solver.kl_div(tmap_temp.sum(axis=1), probs[t, ])
-        cost_direct[lag].append(cost_temp)
+    for segment in t_segments:
+        if segment[1] - segment[0] - lag > 0:
+            for t in range(segment[0], segment[1] - lag):
+                tmap_temp = solver.ot_unbalanced(probs[t, ], probs[t + lag + 1, ], costm, reg=reg, reg1=reg1, reg2=reg2)
+                cost_temp = np.sum(costm * tmap_temp)
+                cost_temp += reg1 * solver.kl_div(tmap_temp.sum(axis=1), probs[t, ])
+                cost_direct[lag].append(cost_temp)
 
 cost_ratio = np.zeros(max_lag)
 for lag in range(max_lag):
@@ -84,6 +98,6 @@ plt.plot(cost_ratio)
 plt.title('ratio of direct cost over coupled cost')
 plt.xlabel('number of omitted time points')
 plt.ylabel('cost ratio')
-# add a horizontal line showing 95%
-plt.axhline(y=0.95, color='r', linestyle='--')
+# add a horizontal line showing threshold
+plt.axhline(y=0.5, color='r', linestyle='--')
 plt.show()
